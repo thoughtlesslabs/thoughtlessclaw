@@ -1,7 +1,7 @@
-import type { OpenClawConfig } from "../config/config.js";
+import type { SkynetConfig } from "../config/config.js";
 
 export function resolveChannelAccountConfigBasePath(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   channelKey: string;
   accountId: string;
 }): string {

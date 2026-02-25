@@ -97,15 +97,15 @@ describe("daemon-cli coverage", () => {
 
   beforeEach(() => {
     envSnapshot = captureEnv([
-      "OPENCLAW_STATE_DIR",
-      "OPENCLAW_CONFIG_PATH",
-      "OPENCLAW_GATEWAY_PORT",
-      "OPENCLAW_PROFILE",
+      "SKYNET_STATE_DIR",
+      "SKYNET_CONFIG_PATH",
+      "SKYNET_GATEWAY_PORT",
+      "SKYNET_PROFILE",
     ]);
-    process.env.OPENCLAW_STATE_DIR = "/tmp/openclaw-cli-state";
-    process.env.OPENCLAW_CONFIG_PATH = "/tmp/openclaw-cli-state/openclaw.json";
-    delete process.env.OPENCLAW_GATEWAY_PORT;
-    delete process.env.OPENCLAW_PROFILE;
+    process.env.SKYNET_STATE_DIR = "/tmp/skynet-cli-state";
+    process.env.SKYNET_CONFIG_PATH = "/tmp/skynet-cli-state/skynet.json";
+    delete process.env.SKYNET_GATEWAY_PORT;
+    delete process.env.SKYNET_PROFILE;
     serviceReadCommand.mockResolvedValue(null);
   });
 
@@ -133,10 +133,10 @@ describe("daemon-cli coverage", () => {
     serviceReadCommand.mockResolvedValueOnce({
       programArguments: ["/bin/node", "cli", "gateway", "--port", "19001"],
       environment: {
-        OPENCLAW_PROFILE: "dev",
-        OPENCLAW_STATE_DIR: "/tmp/openclaw-daemon-state",
-        OPENCLAW_CONFIG_PATH: "/tmp/openclaw-daemon-state/openclaw.json",
-        OPENCLAW_GATEWAY_PORT: "19001",
+        SKYNET_PROFILE: "dev",
+        SKYNET_STATE_DIR: "/tmp/skynet-daemon-state",
+        SKYNET_CONFIG_PATH: "/tmp/skynet-daemon-state/skynet.json",
+        SKYNET_GATEWAY_PORT: "19001",
       },
       sourcePath: "/tmp/bot.molt.gateway.plist",
     });

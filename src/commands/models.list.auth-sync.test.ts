@@ -25,11 +25,11 @@ type AuthSyncFixture = {
 };
 
 async function withAuthSyncFixture(run: (fixture: AuthSyncFixture) => Promise<void>) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-models-list-auth-sync-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "skynet-models-list-auth-sync-"));
   try {
     const stateDir = path.join(root, "state");
     const agentDir = path.join(stateDir, "agents", "main", "agent");
-    const configPath = path.join(stateDir, "openclaw.json");
+    const configPath = path.join(stateDir, "skynet.json");
     const authPath = path.join(agentDir, "auth.json");
 
     await fs.mkdir(agentDir, { recursive: true });
@@ -37,10 +37,10 @@ async function withAuthSyncFixture(run: (fixture: AuthSyncFixture) => Promise<vo
 
     await withEnvAsync(
       {
-        OPENCLAW_STATE_DIR: stateDir,
-        OPENCLAW_AGENT_DIR: agentDir,
+        SKYNET_STATE_DIR: stateDir,
+        SKYNET_AGENT_DIR: agentDir,
         PI_CODING_AGENT_DIR: agentDir,
-        OPENCLAW_CONFIG_PATH: configPath,
+        SKYNET_CONFIG_PATH: configPath,
         OPENROUTER_API_KEY: undefined,
       },
       async () => {

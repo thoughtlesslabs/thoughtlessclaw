@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 
-const loadConfig = vi.hoisted(() => vi.fn(() => ({}) as OpenClawConfig));
+const loadConfig = vi.hoisted(() => vi.fn(() => ({}) as SkynetConfig));
 const resolveDefaultAgentId = vi.hoisted(() => vi.fn(() => "main"));
 const getMemorySearchManager = vi.hoisted(() => vi.fn());
 

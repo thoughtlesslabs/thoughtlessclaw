@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/config.js";
+import type { SkynetConfig } from "../config/config.js";
 import { loadConfig } from "../config/config.js";
 import { loadSessionStore, resolveStorePath } from "../config/sessions.js";
 import type {
@@ -36,11 +36,11 @@ export type ExecApprovalForwarder = {
 };
 
 export type ExecApprovalForwarderDeps = {
-  getConfig?: () => OpenClawConfig;
+  getConfig?: () => SkynetConfig;
   deliver?: typeof deliverOutboundPayloads;
   nowMs?: () => number;
   resolveSessionTarget?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     request: ExecApprovalRequest;
   }) => ExecApprovalForwardTarget | null;
 };
@@ -121,7 +121,7 @@ function resolveChannelAccountConfig<T>(
 // Discord-specific handler is enabled for the same target account.
 function shouldSkipDiscordForwarding(
   target: ExecApprovalForwardTarget,
-  cfg: OpenClawConfig,
+  cfg: SkynetConfig,
 ): boolean {
   const channel = normalizeMessageChannel(target.channel) ?? target.channel;
   if (channel !== "discord") {
@@ -210,7 +210,7 @@ function buildExpiredMessage(request: ExecApprovalRequest) {
 }
 
 function defaultResolveSessionTarget(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   request: ExecApprovalRequest;
 }): ExecApprovalForwardTarget | null {
   const sessionKey = params.request.request.sessionKey?.trim();
@@ -241,7 +241,7 @@ function defaultResolveSessionTarget(params: {
 }
 
 async function deliverToTargets(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   targets: ForwardTarget[];
   text: string;
   deliver: typeof deliverOutboundPayloads;
@@ -272,11 +272,11 @@ async function deliverToTargets(params: {
 }
 
 function resolveForwardTargets(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   config?: ExecApprovalForwardingConfig;
   request: ExecApprovalRequest;
   resolveSessionTarget: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     request: ExecApprovalRequest;
   }) => ExecApprovalForwardTarget | null;
 }): ForwardTarget[] {

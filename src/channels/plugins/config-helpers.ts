@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 
 type ChannelSection = {
@@ -7,12 +7,12 @@ type ChannelSection = {
 };
 
 export function setAccountEnabledInConfigSection(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   sectionKey: string;
   accountId: string;
   enabled: boolean;
   allowTopLevel?: boolean;
-}): OpenClawConfig {
+}): SkynetConfig {
   const accountKey = params.accountId || DEFAULT_ACCOUNT_ID;
   const channels = params.cfg.channels as Record<string, unknown> | undefined;
   const base = channels?.[params.sectionKey] as ChannelSection | undefined;
@@ -27,7 +27,7 @@ export function setAccountEnabledInConfigSection(params: {
           enabled: params.enabled,
         },
       },
-    } as OpenClawConfig;
+    } as SkynetConfig;
   }
 
   const baseAccounts = base?.accounts ?? {};
@@ -47,15 +47,15 @@ export function setAccountEnabledInConfigSection(params: {
         },
       },
     },
-  } as OpenClawConfig;
+  } as SkynetConfig;
 }
 
 export function deleteAccountFromConfigSection(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   sectionKey: string;
   accountId: string;
   clearBaseFields?: string[];
-}): OpenClawConfig {
+}): SkynetConfig {
   const accountKey = params.accountId || DEFAULT_ACCOUNT_ID;
   const channels = params.cfg.channels as Record<string, unknown> | undefined;
   const base = channels?.[params.sectionKey] as ChannelSection | undefined;
@@ -78,7 +78,7 @@ export function deleteAccountFromConfigSection(params: {
           accounts: Object.keys(accounts).length ? accounts : undefined,
         },
       },
-    } as OpenClawConfig;
+    } as SkynetConfig;
   }
 
   if (baseAccounts && Object.keys(baseAccounts).length > 0) {
@@ -98,14 +98,14 @@ export function deleteAccountFromConfigSection(params: {
           accounts: Object.keys(baseAccounts).length ? baseAccounts : undefined,
         },
       },
-    } as OpenClawConfig;
+    } as SkynetConfig;
   }
 
   const nextChannels = { ...params.cfg.channels } as Record<string, unknown>;
   delete nextChannels[params.sectionKey];
-  const nextCfg = { ...params.cfg } as OpenClawConfig;
+  const nextCfg = { ...params.cfg } as SkynetConfig;
   if (Object.keys(nextChannels).length > 0) {
-    nextCfg.channels = nextChannels as OpenClawConfig["channels"];
+    nextCfg.channels = nextChannels as SkynetConfig["channels"];
   } else {
     delete nextCfg.channels;
   }

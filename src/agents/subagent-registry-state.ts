@@ -1,3 +1,4 @@
+import process from "node:process";
 import {
   loadSubagentRegistryFromDisk,
   saveSubagentRegistryToDisk,
@@ -6,7 +7,16 @@ import type { SubagentRunRecord } from "./subagent-registry.types.js";
 
 export function persistSubagentRunsToDisk(runs: Map<string, SubagentRunRecord>) {
   try {
-    saveSubagentRegistryToDisk(runs);
+    // [Skynet Override]: Skynet runs standalone and its workers manage their own state via the Vault.
+    // Prevent Gateway daemon file-lock collisions by filtering Skynet workers out of the registry.
+    const filteredRuns = new Map<string, SubagentRunRecord>();
+    for (const [runId, entry] of runs.entries()) {
+      const isSkynet = entry.childSessionKey?.includes("skynet") || entry.requesterSessionKey?.includes("skynet");
+      if (!isSkynet) {
+        filteredRuns.set(runId, entry);
+      }
+    }
+    saveSubagentRegistryToDisk(filteredRuns);
   } catch {
     // ignore persistence failures
   }

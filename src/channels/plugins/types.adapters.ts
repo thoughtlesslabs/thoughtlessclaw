@@ -1,5 +1,5 @@
 import type { ReplyPayload } from "../../auto-reply/types.js";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 import type { GroupToolPolicyConfig } from "../../config/types.tools.js";
 import type { OutboundDeliveryResult, OutboundSendDeps } from "../../infra/outbound/deliver.js";
 import type { OutboundIdentity } from "../../infra/outbound/identity.js";
@@ -21,50 +21,50 @@ import type {
 } from "./types.core.js";
 
 export type ChannelSetupAdapter = {
-  resolveAccountId?: (params: { cfg: OpenClawConfig; accountId?: string }) => string;
+  resolveAccountId?: (params: { cfg: SkynetConfig; accountId?: string }) => string;
   applyAccountName?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId: string;
     name?: string;
-  }) => OpenClawConfig;
+  }) => SkynetConfig;
   applyAccountConfig: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId: string;
     input: ChannelSetupInput;
-  }) => OpenClawConfig;
+  }) => SkynetConfig;
   validateInput?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId: string;
     input: ChannelSetupInput;
   }) => string | null;
 };
 
 export type ChannelConfigAdapter<ResolvedAccount> = {
-  listAccountIds: (cfg: OpenClawConfig) => string[];
-  resolveAccount: (cfg: OpenClawConfig, accountId?: string | null) => ResolvedAccount;
-  defaultAccountId?: (cfg: OpenClawConfig) => string;
+  listAccountIds: (cfg: SkynetConfig) => string[];
+  resolveAccount: (cfg: SkynetConfig, accountId?: string | null) => ResolvedAccount;
+  defaultAccountId?: (cfg: SkynetConfig) => string;
   setAccountEnabled?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId: string;
     enabled: boolean;
-  }) => OpenClawConfig;
-  deleteAccount?: (params: { cfg: OpenClawConfig; accountId: string }) => OpenClawConfig;
-  isEnabled?: (account: ResolvedAccount, cfg: OpenClawConfig) => boolean;
-  disabledReason?: (account: ResolvedAccount, cfg: OpenClawConfig) => string;
-  isConfigured?: (account: ResolvedAccount, cfg: OpenClawConfig) => boolean | Promise<boolean>;
-  unconfiguredReason?: (account: ResolvedAccount, cfg: OpenClawConfig) => string;
-  describeAccount?: (account: ResolvedAccount, cfg: OpenClawConfig) => ChannelAccountSnapshot;
+  }) => SkynetConfig;
+  deleteAccount?: (params: { cfg: SkynetConfig; accountId: string }) => SkynetConfig;
+  isEnabled?: (account: ResolvedAccount, cfg: SkynetConfig) => boolean;
+  disabledReason?: (account: ResolvedAccount, cfg: SkynetConfig) => string;
+  isConfigured?: (account: ResolvedAccount, cfg: SkynetConfig) => boolean | Promise<boolean>;
+  unconfiguredReason?: (account: ResolvedAccount, cfg: SkynetConfig) => string;
+  describeAccount?: (account: ResolvedAccount, cfg: SkynetConfig) => ChannelAccountSnapshot;
   resolveAllowFrom?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
   }) => Array<string | number> | undefined;
   formatAllowFrom?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
     allowFrom: Array<string | number>;
   }) => string[];
   resolveDefaultTo?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
   }) => string | undefined;
 };
@@ -76,7 +76,7 @@ export type ChannelGroupAdapter = {
 };
 
 export type ChannelOutboundContext = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   to: string;
   text: string;
   mediaUrl?: string;
@@ -101,7 +101,7 @@ export type ChannelOutboundAdapter = {
   textChunkLimit?: number;
   pollMaxOptions?: number;
   resolveTarget?: (params: {
-    cfg?: OpenClawConfig;
+    cfg?: SkynetConfig;
     to?: string;
     allowFrom?: string[];
     accountId?: string | null;
@@ -117,37 +117,37 @@ export type ChannelStatusAdapter<ResolvedAccount, Probe = unknown, Audit = unkno
   defaultRuntime?: ChannelAccountSnapshot;
   buildChannelSummary?: (params: {
     account: ResolvedAccount;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     defaultAccountId: string;
     snapshot: ChannelAccountSnapshot;
   }) => Record<string, unknown> | Promise<Record<string, unknown>>;
   probeAccount?: (params: {
     account: ResolvedAccount;
     timeoutMs: number;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
   }) => Promise<Probe>;
   auditAccount?: (params: {
     account: ResolvedAccount;
     timeoutMs: number;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     probe?: Probe;
   }) => Promise<Audit>;
   buildAccountSnapshot?: (params: {
     account: ResolvedAccount;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     runtime?: ChannelAccountSnapshot;
     probe?: Probe;
     audit?: Audit;
   }) => ChannelAccountSnapshot | Promise<ChannelAccountSnapshot>;
   logSelfId?: (params: {
     account: ResolvedAccount;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     runtime: RuntimeEnv;
     includeChannelPrefix?: boolean;
   }) => void;
   resolveAccountState?: (params: {
     account: ResolvedAccount;
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     configured: boolean;
     enabled: boolean;
   }) => ChannelAccountState;
@@ -155,7 +155,7 @@ export type ChannelStatusAdapter<ResolvedAccount, Probe = unknown, Audit = unkno
 };
 
 export type ChannelGatewayContext<ResolvedAccount = unknown> = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   accountId: string;
   account: ResolvedAccount;
   runtime: RuntimeEnv;
@@ -182,7 +182,7 @@ export type ChannelLoginWithQrWaitResult = {
 };
 
 export type ChannelLogoutContext<ResolvedAccount = unknown> = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   accountId: string;
   account: ResolvedAccount;
   runtime: RuntimeEnv;
@@ -193,7 +193,7 @@ export type ChannelPairingAdapter = {
   idLabel: string;
   normalizeAllowEntry?: (entry: string) => string;
   notifyApproval?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     id: string;
     runtime?: RuntimeEnv;
   }) => Promise<void>;
@@ -217,7 +217,7 @@ export type ChannelGatewayAdapter<ResolvedAccount = unknown> = {
 
 export type ChannelAuthAdapter = {
   login?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
     runtime: RuntimeEnv;
     verbose?: boolean;
@@ -227,24 +227,24 @@ export type ChannelAuthAdapter = {
 
 export type ChannelHeartbeatAdapter = {
   checkReady?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
     deps?: ChannelHeartbeatDeps;
   }) => Promise<{ ok: boolean; reason: string }>;
-  resolveRecipients?: (params: { cfg: OpenClawConfig; opts?: { to?: string; all?: boolean } }) => {
+  resolveRecipients?: (params: { cfg: SkynetConfig; opts?: { to?: string; all?: boolean } }) => {
     recipients: string[];
     source: string;
   };
 };
 
 type ChannelDirectorySelfParams = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   accountId?: string | null;
   runtime: RuntimeEnv;
 };
 
 type ChannelDirectoryListParams = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   accountId?: string | null;
   query?: string | null;
   limit?: number | null;
@@ -252,7 +252,7 @@ type ChannelDirectoryListParams = {
 };
 
 type ChannelDirectoryListGroupMembersParams = {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   accountId?: string | null;
   groupId: string;
   limit?: number | null;
@@ -282,7 +282,7 @@ export type ChannelResolveResult = {
 
 export type ChannelResolverAdapter = {
   resolveTargets: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
     inputs: string[];
     kind: ChannelResolveKind;
@@ -292,7 +292,7 @@ export type ChannelResolverAdapter = {
 
 export type ChannelElevatedAdapter = {
   allowFromFallback?: (params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     accountId?: string | null;
   }) => Array<string | number> | undefined;
 };

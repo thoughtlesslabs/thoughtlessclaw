@@ -1,5 +1,5 @@
 import Testing
-@testable import OpenClaw
+@testable import Skynet
 
 @Suite struct TalkModeConfigParsingTests {
     @Test func prefersNormalizedTalkProviderPayload() async {

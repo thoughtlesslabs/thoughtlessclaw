@@ -2,8 +2,8 @@ import type {
   ChannelAccountSnapshot,
   ChannelDock,
   ChannelPlugin,
-  OpenClawConfig,
-} from "openclaw/plugin-sdk";
+  SkynetConfig,
+} from "skynet/plugin-sdk";
 import {
   applyAccountNameToChannelSection,
   buildChannelConfigSchema,
@@ -18,7 +18,7 @@ import {
   PAIRING_APPROVED_MESSAGE,
   resolveChannelAccountConfigBasePath,
   setAccountEnabledInConfigSection,
-} from "openclaw/plugin-sdk";
+} from "skynet/plugin-sdk";
 import {
   listZaloAccountIds,
   resolveDefaultZaloAccountId,
@@ -233,7 +233,7 @@ export const zaloPlugin: ChannelPlugin<ResolvedZaloAccount> = {
                     : {}),
             },
           },
-        } as OpenClawConfig;
+        } as SkynetConfig;
       }
       return {
         ...next,
@@ -256,7 +256,7 @@ export const zaloPlugin: ChannelPlugin<ResolvedZaloAccount> = {
             },
           },
         },
-      } as OpenClawConfig;
+      } as SkynetConfig;
     },
   },
   pairing: {

@@ -19,11 +19,11 @@ import {
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { MsgContext } from "../../auto-reply/templating.js";
 import { agentCommand } from "../../commands/agent.js";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 import type { DiscordAccountConfig, TtsConfig } from "../../config/types.js";
 import { logVerbose, shouldLogVerbose } from "../../globals.js";
 import { formatErrorMessage } from "../../infra/errors.js";
-import { resolvePreferredOpenClawTmpDir } from "../../infra/tmp-openclaw-dir.js";
+import { resolvePreferredSkynetTmpDir } from "../../infra/tmp-skynet-dir.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   buildProviderRegistry,
@@ -102,8 +102,8 @@ function mergeTtsConfig(base: TtsConfig, override?: TtsConfig): TtsConfig {
   };
 }
 
-function resolveVoiceTtsConfig(params: { cfg: OpenClawConfig; override?: TtsConfig }): {
-  cfg: OpenClawConfig;
+function resolveVoiceTtsConfig(params: { cfg: SkynetConfig; override?: TtsConfig }): {
+  cfg: SkynetConfig;
   resolved: ResolvedTtsConfig;
 } {
   if (!params.override) {
@@ -211,7 +211,7 @@ function estimateDurationSeconds(pcm: Buffer): number {
 }
 
 async function writeWavFile(pcm: Buffer): Promise<{ path: string; durationSeconds: number }> {
-  const tempDir = await fs.mkdtemp(path.join(resolvePreferredOpenClawTmpDir(), "discord-voice-"));
+  const tempDir = await fs.mkdtemp(path.join(resolvePreferredSkynetTmpDir(), "discord-voice-"));
   const filePath = path.join(tempDir, `segment-${randomUUID()}.wav`);
   const wav = buildWavBuffer(pcm);
   await fs.writeFile(filePath, wav);
@@ -231,7 +231,7 @@ function scheduleTempCleanup(tempDir: string, delayMs: number = 30 * 60 * 1000):
 }
 
 async function transcribeAudio(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   agentId: string;
   filePath: string;
 }): Promise<string | undefined> {
@@ -273,7 +273,7 @@ export class DiscordVoiceManager {
   constructor(
     private params: {
       client: Client;
-      cfg: OpenClawConfig;
+      cfg: SkynetConfig;
       discordConfig: DiscordAccountConfig;
       accountId: string;
       runtime: RuntimeEnv;

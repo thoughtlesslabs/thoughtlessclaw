@@ -121,7 +121,7 @@ describe("exec PATH login shell merge", () => {
       return;
     }
     process.env.PATH = "/usr/bin";
-    const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-shell-env-"));
+    const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "skynet-shell-env-"));
     const unregisteredShellPath = path.join(shellDir, "unregistered-shell");
     fs.writeFileSync(unregisteredShellPath, '#!/bin/sh\nexec /bin/sh "$@"\n', {
       encoding: "utf8",

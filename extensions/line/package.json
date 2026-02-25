@@ -1,13 +1,13 @@
 {
-  "name": "@openclaw/line",
+  "name": "@skynet/line",
   "version": "2026.2.23",
   "private": true,
-  "description": "OpenClaw LINE channel plugin",
+  "description": "Skynet LINE channel plugin",
   "type": "module",
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "skynet": "workspace:*"
   },
-  "openclaw": {
+  "skynet": {
     "extensions": [
       "./index.ts"
     ],
@@ -22,7 +22,7 @@
       "quickstartAllowFrom": true
     },
     "install": {
-      "npmSpec": "@openclaw/line",
+      "npmSpec": "@skynet/line",
       "localPath": "extensions/line",
       "defaultChoice": "npm"
     }

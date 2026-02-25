@@ -7,7 +7,7 @@ describe("parseCliProfileArgs", () => {
   it("leaves gateway --dev for subcommands", () => {
     const res = parseCliProfileArgs([
       "node",
-      "openclaw",
+      "skynet",
       "gateway",
       "--dev",
       "--allow-unconfigured",
@@ -16,35 +16,35 @@ describe("parseCliProfileArgs", () => {
       throw new Error(res.error);
     }
     expect(res.profile).toBeNull();
-    expect(res.argv).toEqual(["node", "openclaw", "gateway", "--dev", "--allow-unconfigured"]);
+    expect(res.argv).toEqual(["node", "skynet", "gateway", "--dev", "--allow-unconfigured"]);
   });
 
   it("still accepts global --dev before subcommand", () => {
-    const res = parseCliProfileArgs(["node", "openclaw", "--dev", "gateway"]);
+    const res = parseCliProfileArgs(["node", "skynet", "--dev", "gateway"]);
     if (!res.ok) {
       throw new Error(res.error);
     }
     expect(res.profile).toBe("dev");
-    expect(res.argv).toEqual(["node", "openclaw", "gateway"]);
+    expect(res.argv).toEqual(["node", "skynet", "gateway"]);
   });
 
   it("parses --profile value and strips it", () => {
-    const res = parseCliProfileArgs(["node", "openclaw", "--profile", "work", "status"]);
+    const res = parseCliProfileArgs(["node", "skynet", "--profile", "work", "status"]);
     if (!res.ok) {
       throw new Error(res.error);
     }
     expect(res.profile).toBe("work");
-    expect(res.argv).toEqual(["node", "openclaw", "status"]);
+    expect(res.argv).toEqual(["node", "skynet", "status"]);
   });
 
   it("rejects missing profile value", () => {
-    const res = parseCliProfileArgs(["node", "openclaw", "--profile"]);
+    const res = parseCliProfileArgs(["node", "skynet", "--profile"]);
     expect(res.ok).toBe(false);
   });
 
   it.each([
-    ["--dev first", ["node", "openclaw", "--dev", "--profile", "work", "status"]],
-    ["--profile first", ["node", "openclaw", "--profile", "work", "--dev", "status"]],
+    ["--dev first", ["node", "skynet", "--dev", "--profile", "work", "status"]],
+    ["--profile first", ["node", "skynet", "--profile", "work", "--dev", "status"]],
   ])("rejects combining --dev with --profile (%s)", (_name, argv) => {
     const res = parseCliProfileArgs(argv);
     expect(res.ok).toBe(false);
@@ -59,31 +59,31 @@ describe("applyCliProfileEnv", () => {
       env,
       homedir: () => "/home/peter",
     });
-    const expectedStateDir = path.join(path.resolve("/home/peter"), ".openclaw-dev");
-    expect(env.OPENCLAW_PROFILE).toBe("dev");
-    expect(env.OPENCLAW_STATE_DIR).toBe(expectedStateDir);
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join(expectedStateDir, "openclaw.json"));
-    expect(env.OPENCLAW_GATEWAY_PORT).toBe("19001");
+    const expectedStateDir = path.join(path.resolve("/home/peter"), ".skynet-dev");
+    expect(env.SKYNET_PROFILE).toBe("dev");
+    expect(env.SKYNET_STATE_DIR).toBe(expectedStateDir);
+    expect(env.SKYNET_CONFIG_PATH).toBe(path.join(expectedStateDir, "skynet.json"));
+    expect(env.SKYNET_GATEWAY_PORT).toBe("19001");
   });
 
   it("does not override explicit env values", () => {
     const env: Record<string, string | undefined> = {
-      OPENCLAW_STATE_DIR: "/custom",
-      OPENCLAW_GATEWAY_PORT: "19099",
+      SKYNET_STATE_DIR: "/custom",
+      SKYNET_GATEWAY_PORT: "19099",
     };
     applyCliProfileEnv({
       profile: "dev",
       env,
       homedir: () => "/home/peter",
     });
-    expect(env.OPENCLAW_STATE_DIR).toBe("/custom");
-    expect(env.OPENCLAW_GATEWAY_PORT).toBe("19099");
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(path.join("/custom", "openclaw.json"));
+    expect(env.SKYNET_STATE_DIR).toBe("/custom");
+    expect(env.SKYNET_GATEWAY_PORT).toBe("19099");
+    expect(env.SKYNET_CONFIG_PATH).toBe(path.join("/custom", "skynet.json"));
   });
 
-  it("uses OPENCLAW_HOME when deriving profile state dir", () => {
+  it("uses SKYNET_HOME when deriving profile state dir", () => {
     const env: Record<string, string | undefined> = {
-      OPENCLAW_HOME: "/srv/openclaw-home",
+      SKYNET_HOME: "/srv/skynet-home",
       HOME: "/home/other",
     };
     applyCliProfileEnv({
@@ -92,10 +92,10 @@ describe("applyCliProfileEnv", () => {
       homedir: () => "/home/fallback",
     });
 
-    const resolvedHome = path.resolve("/srv/openclaw-home");
-    expect(env.OPENCLAW_STATE_DIR).toBe(path.join(resolvedHome, ".openclaw-work"));
-    expect(env.OPENCLAW_CONFIG_PATH).toBe(
-      path.join(resolvedHome, ".openclaw-work", "openclaw.json"),
+    const resolvedHome = path.resolve("/srv/skynet-home");
+    expect(env.SKYNET_STATE_DIR).toBe(path.join(resolvedHome, ".skynet-work"));
+    expect(env.SKYNET_CONFIG_PATH).toBe(
+      path.join(resolvedHome, ".skynet-work", "skynet.json"),
     );
   });
 });
@@ -104,65 +104,65 @@ describe("formatCliCommand", () => {
   it.each([
     {
       name: "no profile is set",
-      cmd: "openclaw doctor --fix",
+      cmd: "skynet doctor --fix",
       env: {},
-      expected: "openclaw doctor --fix",
+      expected: "skynet doctor --fix",
     },
     {
       name: "profile is default",
-      cmd: "openclaw doctor --fix",
-      env: { OPENCLAW_PROFILE: "default" },
-      expected: "openclaw doctor --fix",
+      cmd: "skynet doctor --fix",
+      env: { SKYNET_PROFILE: "default" },
+      expected: "skynet doctor --fix",
     },
     {
       name: "profile is Default (case-insensitive)",
-      cmd: "openclaw doctor --fix",
-      env: { OPENCLAW_PROFILE: "Default" },
-      expected: "openclaw doctor --fix",
+      cmd: "skynet doctor --fix",
+      env: { SKYNET_PROFILE: "Default" },
+      expected: "skynet doctor --fix",
     },
     {
       name: "profile is invalid",
-      cmd: "openclaw doctor --fix",
-      env: { OPENCLAW_PROFILE: "bad profile" },
-      expected: "openclaw doctor --fix",
+      cmd: "skynet doctor --fix",
+      env: { SKYNET_PROFILE: "bad profile" },
+      expected: "skynet doctor --fix",
     },
     {
       name: "--profile is already present",
-      cmd: "openclaw --profile work doctor --fix",
-      env: { OPENCLAW_PROFILE: "work" },
-      expected: "openclaw --profile work doctor --fix",
+      cmd: "skynet --profile work doctor --fix",
+      env: { SKYNET_PROFILE: "work" },
+      expected: "skynet --profile work doctor --fix",
     },
     {
       name: "--dev is already present",
-      cmd: "openclaw --dev doctor",
-      env: { OPENCLAW_PROFILE: "dev" },
-      expected: "openclaw --dev doctor",
+      cmd: "skynet --dev doctor",
+      env: { SKYNET_PROFILE: "dev" },
+      expected: "skynet --dev doctor",
     },
   ])("returns command unchanged when $name", ({ cmd, env, expected }) => {
     expect(formatCliCommand(cmd, env)).toBe(expected);
   });
 
   it("inserts --profile flag when profile is set", () => {
-    expect(formatCliCommand("openclaw doctor --fix", { OPENCLAW_PROFILE: "work" })).toBe(
-      "openclaw --profile work doctor --fix",
+    expect(formatCliCommand("skynet doctor --fix", { SKYNET_PROFILE: "work" })).toBe(
+      "skynet --profile work doctor --fix",
     );
   });
 
   it("trims whitespace from profile", () => {
-    expect(formatCliCommand("openclaw doctor --fix", { OPENCLAW_PROFILE: "  jbopenclaw  " })).toBe(
-      "openclaw --profile jbopenclaw doctor --fix",
+    expect(formatCliCommand("skynet doctor --fix", { SKYNET_PROFILE: "  jbskynet  " })).toBe(
+      "skynet --profile jbskynet doctor --fix",
     );
   });
 
-  it("handles command with no args after openclaw", () => {
-    expect(formatCliCommand("openclaw", { OPENCLAW_PROFILE: "test" })).toBe(
-      "openclaw --profile test",
+  it("handles command with no args after skynet", () => {
+    expect(formatCliCommand("skynet", { SKYNET_PROFILE: "test" })).toBe(
+      "skynet --profile test",
     );
   });
 
   it("handles pnpm wrapper", () => {
-    expect(formatCliCommand("pnpm openclaw doctor", { OPENCLAW_PROFILE: "work" })).toBe(
-      "pnpm openclaw --profile work doctor",
+    expect(formatCliCommand("pnpm skynet doctor", { SKYNET_PROFILE: "work" })).toBe(
+      "pnpm skynet --profile work doctor",
     );
   });
 });

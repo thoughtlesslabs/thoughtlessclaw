@@ -1,5 +1,5 @@
 /**
- * Synology Chat Channel Plugin for OpenClaw.
+ * Synology Chat Channel Plugin for Skynet.
  *
  * Implements the ChannelPlugin interface following the LINE pattern.
  */
@@ -9,7 +9,7 @@ import {
   setAccountEnabledInConfigSection,
   registerPluginHttpRoute,
   buildChannelConfigSchema,
-} from "openclaw/plugin-sdk";
+} from "skynet/plugin-sdk";
 import { z } from "zod";
 import { listAccountIds, resolveAccount } from "./accounts.js";
 import { sendMessage, sendFileUrl } from "./client.js";
@@ -32,7 +32,7 @@ export function createSynologyChatPlugin() {
       selectionLabel: "Synology Chat (Webhook)",
       detailLabel: "Synology Chat (Webhook)",
       docsPath: "/channels/synology-chat",
-      blurb: "Connect your Synology NAS Chat to OpenClaw",
+      blurb: "Connect your Synology NAS Chat to Skynet",
       order: 90,
     },
 
@@ -87,7 +87,7 @@ export function createSynologyChatPlugin() {
         if (!account.incomingUrl) return;
         await sendMessage(
           account.incomingUrl,
-          "OpenClaw: your access has been approved.",
+          "Skynet: your access has been approved.",
           id,
           account.allowInsecureSsl,
         );
@@ -115,7 +115,7 @@ export function createSynologyChatPlugin() {
           allowFrom: account.allowedUserIds ?? [],
           policyPath: `${basePath}dmPolicy`,
           allowFromPath: basePath,
-          approveHint: "openclaw pairing approve synology-chat <code>",
+          approveHint: "skynet pairing approve synology-chat <code>",
           normalizeEntry: (raw: string) => raw.toLowerCase().trim(),
         };
       },

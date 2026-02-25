@@ -86,13 +86,13 @@ describe("gateway auth", () => {
     expect(res.user).toBe(params.expected.user);
   }
 
-  it("resolves token/password from OPENCLAW gateway env vars", () => {
+  it("resolves token/password from SKYNET gateway env vars", () => {
     expect(
       resolveGatewayAuth({
         authConfig: {},
         env: {
-          OPENCLAW_GATEWAY_TOKEN: "env-token",
-          OPENCLAW_GATEWAY_PASSWORD: "env-password",
+          SKYNET_GATEWAY_TOKEN: "env-token",
+          SKYNET_GATEWAY_PASSWORD: "env-password",
         } as NodeJS.ProcessEnv,
       }),
     ).toMatchObject({
@@ -128,8 +128,8 @@ describe("gateway auth", () => {
           password: "config-password",
         },
         env: {
-          OPENCLAW_GATEWAY_TOKEN: "env-token",
-          OPENCLAW_GATEWAY_PASSWORD: "env-password",
+          SKYNET_GATEWAY_TOKEN: "env-token",
+          SKYNET_GATEWAY_PASSWORD: "env-password",
         } as NodeJS.ProcessEnv,
       }),
     ).toMatchObject({

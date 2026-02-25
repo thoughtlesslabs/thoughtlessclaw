@@ -55,21 +55,21 @@ export function registerStatusHealthSessionsCommands(program: Command) {
       "after",
       () =>
         `\n${theme.heading("Examples:")}\n${formatHelpExamples([
-          ["openclaw status", "Show channel health + session summary."],
-          ["openclaw status --all", "Full diagnosis (read-only)."],
-          ["openclaw status --json", "Machine-readable output."],
-          ["openclaw status --usage", "Show model provider usage/quota snapshots."],
+          ["skynet status", "Show channel health + session summary."],
+          ["skynet status --all", "Full diagnosis (read-only)."],
+          ["skynet status --json", "Machine-readable output."],
+          ["skynet status --usage", "Show model provider usage/quota snapshots."],
           [
-            "openclaw status --deep",
+            "skynet status --deep",
             "Run channel probes (WA + Telegram + Discord + Slack + Signal).",
           ],
-          ["openclaw status --deep --timeout 5000", "Tighten probe timeout."],
+          ["skynet status --deep --timeout 5000", "Tighten probe timeout."],
         ])}`,
     )
     .addHelpText(
       "after",
       () =>
-        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/status", "docs.openclaw.ai/cli/status")}\n`,
+        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/status", "docs.skynet.ai/cli/status")}\n`,
     )
     .action(async (opts) => {
       await runWithVerboseAndTimeout(opts, async ({ verbose, timeoutMs }) => {
@@ -97,7 +97,7 @@ export function registerStatusHealthSessionsCommands(program: Command) {
     .addHelpText(
       "after",
       () =>
-        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/health", "docs.openclaw.ai/cli/health")}\n`,
+        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/health", "docs.skynet.ai/cli/health")}\n`,
     )
     .action(async (opts) => {
       await runWithVerboseAndTimeout(opts, async ({ verbose, timeoutMs }) => {
@@ -125,12 +125,12 @@ export function registerStatusHealthSessionsCommands(program: Command) {
       "after",
       () =>
         `\n${theme.heading("Examples:")}\n${formatHelpExamples([
-          ["openclaw sessions", "List all sessions."],
-          ["openclaw sessions --agent work", "List sessions for one agent."],
-          ["openclaw sessions --all-agents", "Aggregate sessions across agents."],
-          ["openclaw sessions --active 120", "Only last 2 hours."],
-          ["openclaw sessions --json", "Machine-readable output."],
-          ["openclaw sessions --store ./tmp/sessions.json", "Use a specific session store."],
+          ["skynet sessions", "List all sessions."],
+          ["skynet sessions --agent work", "List sessions for one agent."],
+          ["skynet sessions --all-agents", "Aggregate sessions across agents."],
+          ["skynet sessions --active 120", "Only last 2 hours."],
+          ["skynet sessions --json", "Machine-readable output."],
+          ["skynet sessions --store ./tmp/sessions.json", "Use a specific session store."],
         ])}\n\n${theme.muted(
           "Shows token usage per session when the agent reports it; set agents.defaults.contextTokens to cap the window and show %.",
         )}`,
@@ -138,7 +138,7 @@ export function registerStatusHealthSessionsCommands(program: Command) {
     .addHelpText(
       "after",
       () =>
-        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/sessions", "docs.openclaw.ai/cli/sessions")}\n`,
+        `\n${theme.muted("Docs:")} ${formatDocsLink("/cli/sessions", "docs.skynet.ai/cli/sessions")}\n`,
     )
     .action(async (opts) => {
       setVerbose(Boolean(opts.verbose));
@@ -169,12 +169,12 @@ export function registerStatusHealthSessionsCommands(program: Command) {
       "after",
       () =>
         `\n${theme.heading("Examples:")}\n${formatHelpExamples([
-          ["openclaw sessions cleanup --dry-run", "Preview stale/cap cleanup."],
-          ["openclaw sessions cleanup --enforce", "Apply maintenance now."],
-          ["openclaw sessions cleanup --agent work --dry-run", "Preview one agent store."],
-          ["openclaw sessions cleanup --all-agents --dry-run", "Preview all agent stores."],
+          ["skynet sessions cleanup --dry-run", "Preview stale/cap cleanup."],
+          ["skynet sessions cleanup --enforce", "Apply maintenance now."],
+          ["skynet sessions cleanup --agent work --dry-run", "Preview one agent store."],
+          ["skynet sessions cleanup --all-agents --dry-run", "Preview all agent stores."],
           [
-            "openclaw sessions cleanup --enforce --store ./tmp/sessions.json",
+            "skynet sessions cleanup --enforce --store ./tmp/sessions.json",
             "Use a specific store.",
           ],
         ])}`,

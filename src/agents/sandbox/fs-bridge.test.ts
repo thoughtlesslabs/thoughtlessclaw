@@ -115,7 +115,7 @@ describe("sandbox fs bridge shell compatibility", () => {
   });
 
   it("rejects pre-existing host symlink escapes before docker exec", async () => {
-    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-fs-bridge-"));
+    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "skynet-fs-bridge-"));
     const workspaceDir = path.join(stateDir, "workspace");
     const outsideDir = path.join(stateDir, "outside");
     const outsideFile = path.join(outsideDir, "secret.txt");

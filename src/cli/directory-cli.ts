@@ -70,19 +70,19 @@ export function registerDirectoryCli(program: Command) {
       "after",
       () =>
         `\n${theme.heading("Examples:")}\n${formatHelpExamples([
-          ["openclaw directory self --channel slack", "Show the connected account identity."],
+          ["skynet directory self --channel slack", "Show the connected account identity."],
           [
-            'openclaw directory peers list --channel slack --query "alice"',
+            'skynet directory peers list --channel slack --query "alice"',
             "Search contact/user IDs by name.",
           ],
-          ["openclaw directory groups list --channel discord", "List available groups/channels."],
+          ["skynet directory groups list --channel discord", "List available groups/channels."],
           [
-            "openclaw directory groups members --channel discord --group-id <id>",
+            "skynet directory groups members --channel discord --group-id <id>",
             "List members for a specific group.",
           ],
         ])}\n\n${theme.muted("Docs:")} ${formatDocsLink(
           "/cli/directory",
-          "docs.openclaw.ai/cli/directory",
+          "docs.skynet.ai/cli/directory",
         )}\n`,
     )
     .action(() => {

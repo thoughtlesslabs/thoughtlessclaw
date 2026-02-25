@@ -1,6 +1,6 @@
-import OpenClawKit
+import SkynetKit
 import Testing
-@testable import OpenClaw
+@testable import Skynet
 
 @Suite struct IOSGatewayChatTransportTests {
     @Test func requestsFailFastWhenGatewayNotConnected() async {

@@ -1,12 +1,12 @@
 {
-  "name": "@openclaw/irc",
+  "name": "@skynet/irc",
   "version": "2026.2.23",
-  "description": "OpenClaw IRC channel plugin",
+  "description": "Skynet IRC channel plugin",
   "type": "module",
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "skynet": "workspace:*"
   },
-  "openclaw": {
+  "skynet": {
     "extensions": [
       "./index.ts"
     ]

@@ -8,7 +8,7 @@ import {
   resolveInternalSessionKey,
   resolveMainSessionAlias,
 } from "../../agents/tools/sessions-helpers.js";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 import {
   loadSessionStore,
   resolveStorePath,
@@ -51,8 +51,8 @@ const ABORT_TRIGGERS = new Set([
   "hoer auf",
   "stopp",
   "pare",
-  "stop openclaw",
-  "openclaw stop",
+  "stop skynet",
+  "skynet stop",
   "stop action",
   "stop current action",
   "stop run",
@@ -184,7 +184,7 @@ function resolveAbortTargetKey(ctx: MsgContext): string | undefined {
 }
 
 function normalizeRequesterSessionKey(
-  cfg: OpenClawConfig,
+  cfg: SkynetConfig,
   key: string | undefined,
 ): string | undefined {
   const cleaned = key?.trim();
@@ -196,7 +196,7 @@ function normalizeRequesterSessionKey(
 }
 
 export function stopSubagentsForRequester(params: {
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
   requesterSessionKey?: string;
 }): { stopped: number } {
   const requesterKey = normalizeRequesterSessionKey(params.cfg, params.requesterSessionKey);
@@ -259,7 +259,7 @@ export function stopSubagentsForRequester(params: {
 
 export async function tryFastAbortFromMessage(params: {
   ctx: FinalizedMsgContext;
-  cfg: OpenClawConfig;
+  cfg: SkynetConfig;
 }): Promise<{ handled: boolean; aborted: boolean; stoppedSubagents?: number }> {
   const { ctx, cfg } = params;
   const targetKey = resolveAbortTargetKey(ctx);

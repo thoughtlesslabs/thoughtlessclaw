@@ -1,16 +1,16 @@
 {
-  "name": "@openclaw/memory-core",
+  "name": "@skynet/memory-core",
   "version": "2026.2.23",
   "private": true,
-  "description": "OpenClaw core memory search plugin",
+  "description": "Skynet core memory search plugin",
   "type": "module",
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "skynet": "workspace:*"
   },
   "peerDependencies": {
-    "openclaw": ">=2026.1.26"
+    "skynet": ">=2026.1.26"
   },
-  "openclaw": {
+  "skynet": {
     "extensions": [
       "./index.ts"
     ]

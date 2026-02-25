@@ -1,16 +1,16 @@
 export const GATEWAY_CLIENT_IDS = {
   WEBCHAT_UI: "webchat-ui",
-  CONTROL_UI: "openclaw-control-ui",
+  CONTROL_UI: "skynet-control-ui",
   WEBCHAT: "webchat",
   CLI: "cli",
   GATEWAY_CLIENT: "gateway-client",
-  MACOS_APP: "openclaw-macos",
-  IOS_APP: "openclaw-ios",
-  ANDROID_APP: "openclaw-android",
+  MACOS_APP: "skynet-macos",
+  IOS_APP: "skynet-ios",
+  ANDROID_APP: "skynet-android",
   NODE_HOST: "node-host",
   TEST: "test",
   FINGERPRINT: "fingerprint",
-  PROBE: "openclaw-probe",
+  PROBE: "skynet-probe",
 } as const;
 
 export type GatewayClientId = (typeof GATEWAY_CLIENT_IDS)[keyof typeof GATEWAY_CLIENT_IDS];

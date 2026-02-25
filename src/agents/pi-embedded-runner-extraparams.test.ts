@@ -326,8 +326,8 @@ describe("applyExtraParamsToAgent", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.headers).toEqual({
-      "HTTP-Referer": "https://openclaw.ai",
-      "X-Title": "OpenClaw",
+      "HTTP-Referer": "https://skynet.ai",
+      "X-Title": "Skynet",
       "X-Custom": "1",
     });
   });

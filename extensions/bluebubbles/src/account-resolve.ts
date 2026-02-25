@@ -1,11 +1,11 @@
-import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import type { SkynetConfig } from "skynet/plugin-sdk";
 import { resolveBlueBubblesAccount } from "./accounts.js";
 
 export type BlueBubblesAccountResolveOpts = {
   serverUrl?: string;
   password?: string;
   accountId?: string;
-  cfg?: OpenClawConfig;
+  cfg?: SkynetConfig;
 };
 
 export function resolveBlueBubblesServerAccount(params: BlueBubblesAccountResolveOpts): {

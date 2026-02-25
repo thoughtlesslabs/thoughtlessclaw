@@ -1,5 +1,5 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { emptyPluginConfigSchema } from "openclaw/plugin-sdk";
+import type { SkynetPluginApi } from "skynet/plugin-sdk";
+import { emptyPluginConfigSchema } from "skynet/plugin-sdk";
 import { nostrPlugin } from "./src/channel.js";
 import type { NostrProfile } from "./src/config-schema.js";
 import { createNostrProfileHttpHandler } from "./src/nostr-profile-http.js";
@@ -11,7 +11,7 @@ const plugin = {
   name: "Nostr",
   description: "Nostr DM channel plugin via NIP-04",
   configSchema: emptyPluginConfigSchema(),
-  register(api: OpenClawPluginApi) {
+  register(api: SkynetPluginApi) {
     setNostrRuntime(api.runtime);
     api.registerChannel({ plugin: nostrPlugin });
 

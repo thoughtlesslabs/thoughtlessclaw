@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveSafeExternalUrl } from "./open-external-url.ts";
 
 describe("resolveSafeExternalUrl", () => {
-  const baseHref = "https://openclaw.ai/chat";
+  const baseHref = "https://skynet.ai/chat";
 
   it("allows absolute https URLs", () => {
     expect(resolveSafeExternalUrl("https://example.com/a.png?x=1#y", baseHref)).toBe(
@@ -12,13 +12,13 @@ describe("resolveSafeExternalUrl", () => {
 
   it("allows relative URLs resolved against the current origin", () => {
     expect(resolveSafeExternalUrl("/assets/pic.png", baseHref)).toBe(
-      "https://openclaw.ai/assets/pic.png",
+      "https://skynet.ai/assets/pic.png",
     );
   });
 
   it("allows blob URLs", () => {
-    expect(resolveSafeExternalUrl("blob:https://openclaw.ai/abc-123", baseHref)).toBe(
-      "blob:https://openclaw.ai/abc-123",
+    expect(resolveSafeExternalUrl("blob:https://skynet.ai/abc-123", baseHref)).toBe(
+      "blob:https://skynet.ai/abc-123",
     );
   });
 

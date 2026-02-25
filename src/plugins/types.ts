@@ -7,7 +7,7 @@ import type { ReplyPayload } from "../auto-reply/types.js";
 import type { ChannelDock } from "../channels/dock.js";
 import type { ChannelId, ChannelPlugin } from "../channels/plugins/types.js";
 import type { createVpsAwareOAuthHandlers } from "../commands/oauth-flow.js";
-import type { OpenClawConfig } from "../config/config.js";
+import type { SkynetConfig } from "../config/config.js";
 import type { ModelProviderConfig } from "../config/types.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import type { InternalHookHandler } from "../hooks/internal-hooks.js";
@@ -41,7 +41,7 @@ export type PluginConfigValidation =
   | { ok: true; value?: unknown }
   | { ok: false; errors: string[] };
 
-export type OpenClawPluginConfigSchema = {
+export type SkynetPluginConfigSchema = {
   safeParse?: (value: unknown) => {
     success: boolean;
     data?: unknown;
@@ -55,8 +55,8 @@ export type OpenClawPluginConfigSchema = {
   jsonSchema?: Record<string, unknown>;
 };
 
-export type OpenClawPluginToolContext = {
-  config?: OpenClawConfig;
+export type SkynetPluginToolContext = {
+  config?: SkynetConfig;
   workspaceDir?: string;
   agentDir?: string;
   agentId?: string;
@@ -66,17 +66,17 @@ export type OpenClawPluginToolContext = {
   sandboxed?: boolean;
 };
 
-export type OpenClawPluginToolFactory = (
-  ctx: OpenClawPluginToolContext,
+export type SkynetPluginToolFactory = (
+  ctx: SkynetPluginToolContext,
 ) => AnyAgentTool | AnyAgentTool[] | null | undefined;
 
-export type OpenClawPluginToolOptions = {
+export type SkynetPluginToolOptions = {
   name?: string;
   names?: string[];
   optional?: boolean;
 };
 
-export type OpenClawPluginHookOptions = {
+export type SkynetPluginHookOptions = {
   entry?: HookEntry;
   name?: string;
   description?: string;
@@ -87,13 +87,13 @@ export type ProviderAuthKind = "oauth" | "api_key" | "token" | "device_code" | "
 
 export type ProviderAuthResult = {
   profiles: Array<{ profileId: string; credential: AuthProfileCredential }>;
-  configPatch?: Partial<OpenClawConfig>;
+  configPatch?: Partial<SkynetConfig>;
   defaultModel?: string;
   notes?: string[];
 };
 
 export type ProviderAuthContext = {
-  config: OpenClawConfig;
+  config: SkynetConfig;
   agentDir?: string;
   workspaceDir?: string;
   prompter: WizardPrompter;
@@ -125,7 +125,7 @@ export type ProviderPlugin = {
   refreshOAuth?: (cred: OAuthCredential) => Promise<OAuthCredential>;
 };
 
-export type OpenClawPluginGatewayMethod = {
+export type SkynetPluginGatewayMethod = {
   method: string;
   handler: GatewayRequestHandler;
 };
@@ -150,8 +150,8 @@ export type PluginCommandContext = {
   args?: string;
   /** The full normalized command body */
   commandBody: string;
-  /** Current OpenClaw configuration */
-  config: OpenClawConfig;
+  /** Current Skynet configuration */
+  config: SkynetConfig;
   /** Raw "From" value (channel-scoped id) */
   from?: string;
   /** Raw "To" value (channel-scoped id) */
@@ -177,7 +177,7 @@ export type PluginCommandHandler = (
 /**
  * Definition for a plugin-registered command.
  */
-export type OpenClawPluginCommandDefinition = {
+export type SkynetPluginCommandDefinition = {
   /** Command name without leading slash (e.g., "tts") */
   name: string;
   /** Description shown in /help and command menus */
@@ -190,90 +190,90 @@ export type OpenClawPluginCommandDefinition = {
   handler: PluginCommandHandler;
 };
 
-export type OpenClawPluginHttpHandler = (
+export type SkynetPluginHttpHandler = (
   req: IncomingMessage,
   res: ServerResponse,
 ) => Promise<boolean> | boolean;
 
-export type OpenClawPluginHttpRouteHandler = (
+export type SkynetPluginHttpRouteHandler = (
   req: IncomingMessage,
   res: ServerResponse,
 ) => Promise<void> | void;
 
-export type OpenClawPluginCliContext = {
+export type SkynetPluginCliContext = {
   program: Command;
-  config: OpenClawConfig;
+  config: SkynetConfig;
   workspaceDir?: string;
   logger: PluginLogger;
 };
 
-export type OpenClawPluginCliRegistrar = (ctx: OpenClawPluginCliContext) => void | Promise<void>;
+export type SkynetPluginCliRegistrar = (ctx: SkynetPluginCliContext) => void | Promise<void>;
 
-export type OpenClawPluginServiceContext = {
-  config: OpenClawConfig;
+export type SkynetPluginServiceContext = {
+  config: SkynetConfig;
   workspaceDir?: string;
   stateDir: string;
   logger: PluginLogger;
 };
 
-export type OpenClawPluginService = {
+export type SkynetPluginService = {
   id: string;
-  start: (ctx: OpenClawPluginServiceContext) => void | Promise<void>;
-  stop?: (ctx: OpenClawPluginServiceContext) => void | Promise<void>;
+  start: (ctx: SkynetPluginServiceContext) => void | Promise<void>;
+  stop?: (ctx: SkynetPluginServiceContext) => void | Promise<void>;
 };
 
-export type OpenClawPluginChannelRegistration = {
+export type SkynetPluginChannelRegistration = {
   plugin: ChannelPlugin;
   dock?: ChannelDock;
 };
 
-export type OpenClawPluginDefinition = {
+export type SkynetPluginDefinition = {
   id?: string;
   name?: string;
   description?: string;
   version?: string;
   kind?: PluginKind;
-  configSchema?: OpenClawPluginConfigSchema;
-  register?: (api: OpenClawPluginApi) => void | Promise<void>;
-  activate?: (api: OpenClawPluginApi) => void | Promise<void>;
+  configSchema?: SkynetPluginConfigSchema;
+  register?: (api: SkynetPluginApi) => void | Promise<void>;
+  activate?: (api: SkynetPluginApi) => void | Promise<void>;
 };
 
-export type OpenClawPluginModule =
-  | OpenClawPluginDefinition
-  | ((api: OpenClawPluginApi) => void | Promise<void>);
+export type SkynetPluginModule =
+  | SkynetPluginDefinition
+  | ((api: SkynetPluginApi) => void | Promise<void>);
 
-export type OpenClawPluginApi = {
+export type SkynetPluginApi = {
   id: string;
   name: string;
   version?: string;
   description?: string;
   source: string;
-  config: OpenClawConfig;
+  config: SkynetConfig;
   pluginConfig?: Record<string, unknown>;
   runtime: PluginRuntime;
   logger: PluginLogger;
   registerTool: (
-    tool: AnyAgentTool | OpenClawPluginToolFactory,
-    opts?: OpenClawPluginToolOptions,
+    tool: AnyAgentTool | SkynetPluginToolFactory,
+    opts?: SkynetPluginToolOptions,
   ) => void;
   registerHook: (
     events: string | string[],
     handler: InternalHookHandler,
-    opts?: OpenClawPluginHookOptions,
+    opts?: SkynetPluginHookOptions,
   ) => void;
-  registerHttpHandler: (handler: OpenClawPluginHttpHandler) => void;
-  registerHttpRoute: (params: { path: string; handler: OpenClawPluginHttpRouteHandler }) => void;
-  registerChannel: (registration: OpenClawPluginChannelRegistration | ChannelPlugin) => void;
+  registerHttpHandler: (handler: SkynetPluginHttpHandler) => void;
+  registerHttpRoute: (params: { path: string; handler: SkynetPluginHttpRouteHandler }) => void;
+  registerChannel: (registration: SkynetPluginChannelRegistration | ChannelPlugin) => void;
   registerGatewayMethod: (method: string, handler: GatewayRequestHandler) => void;
-  registerCli: (registrar: OpenClawPluginCliRegistrar, opts?: { commands?: string[] }) => void;
-  registerService: (service: OpenClawPluginService) => void;
+  registerCli: (registrar: SkynetPluginCliRegistrar, opts?: { commands?: string[] }) => void;
+  registerService: (service: SkynetPluginService) => void;
   registerProvider: (provider: ProviderPlugin) => void;
   /**
    * Register a custom command that bypasses the LLM agent.
    * Plugin commands are processed before built-in commands and before agent invocation.
    * Use this for simple state-toggling or status commands that don't need AI reasoning.
    */
-  registerCommand: (command: OpenClawPluginCommandDefinition) => void;
+  registerCommand: (command: SkynetPluginCommandDefinition) => void;
   resolvePath: (input: string) => string;
   /** Register a lifecycle hook handler */
   on: <K extends PluginHookName>(

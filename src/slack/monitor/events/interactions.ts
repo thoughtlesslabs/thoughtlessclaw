@@ -5,8 +5,8 @@ import { parseSlackModalPrivateMetadata } from "../../modal-metadata.js";
 import type { SlackMonitorContext } from "../context.js";
 import { escapeSlackMrkdwn } from "../mrkdwn.js";
 
-// Prefix for OpenClaw-generated action IDs to scope our handler
-const OPENCLAW_ACTION_PREFIX = "openclaw:";
+// Prefix for Skynet-generated action IDs to scope our handler
+const SKYNET_ACTION_PREFIX = "skynet:";
 
 type InteractionMessageBlock = {
   type?: string;
@@ -512,11 +512,11 @@ export function registerSlackInteractionEvents(params: { ctx: SlackMonitorContex
     return;
   }
 
-  // Handle Block Kit button clicks from OpenClaw-generated messages
+  // Handle Block Kit button clicks from Skynet-generated messages
   // Only matches action_ids that start with our prefix to avoid interfering
   // with other Slack integrations or future features
   ctx.app.action(
-    new RegExp(`^${OPENCLAW_ACTION_PREFIX}`),
+    new RegExp(`^${SKYNET_ACTION_PREFIX}`),
     async (args: SlackActionMiddlewareArgs) => {
       const { ack, body, action, respond } = args;
       const typedBody = body as unknown as {
@@ -669,9 +669,9 @@ export function registerSlackInteractionEvents(params: { ctx: SlackMonitorContex
   if (typeof ctx.app.view !== "function") {
     return;
   }
-  const modalMatcher = new RegExp(`^${OPENCLAW_ACTION_PREFIX}`);
+  const modalMatcher = new RegExp(`^${SKYNET_ACTION_PREFIX}`);
 
-  // Handle OpenClaw modal submissions with callback_ids scoped by our prefix.
+  // Handle Skynet modal submissions with callback_ids scoped by our prefix.
   registerModalLifecycleHandler({
     register: (matcher, handler) => ctx.app.view(matcher, handler),
     matcher: modalMatcher,

@@ -1,16 +1,16 @@
 {
-  "name": "@openclaw/msteams",
+  "name": "@skynet/msteams",
   "version": "2026.2.23",
-  "description": "OpenClaw Microsoft Teams channel plugin",
+  "description": "Skynet Microsoft Teams channel plugin",
   "type": "module",
   "dependencies": {
     "@microsoft/agents-hosting": "^1.3.1",
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "skynet": "workspace:*"
   },
-  "openclaw": {
+  "skynet": {
     "extensions": [
       "./index.ts"
     ],
@@ -27,7 +27,7 @@
       "order": 60
     },
     "install": {
-      "npmSpec": "@openclaw/msteams",
+      "npmSpec": "@skynet/msteams",
       "localPath": "extensions/msteams",
       "defaultChoice": "npm"
     }

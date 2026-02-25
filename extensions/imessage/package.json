@@ -1,13 +1,13 @@
 {
-  "name": "@openclaw/imessage",
+  "name": "@skynet/imessage",
   "version": "2026.2.23",
   "private": true,
-  "description": "OpenClaw iMessage channel plugin",
+  "description": "Skynet iMessage channel plugin",
   "type": "module",
   "devDependencies": {
-    "openclaw": "workspace:*"
+    "skynet": "workspace:*"
   },
-  "openclaw": {
+  "skynet": {
     "extensions": [
       "./index.ts"
     ]

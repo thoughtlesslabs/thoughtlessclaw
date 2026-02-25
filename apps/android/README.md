@@ -1,4 +1,4 @@
-## OpenClaw Android App
+## Skynet Android App
 
 Status: **extremely alpha**. The app is actively being rebuilt from the ground up.
 
@@ -39,7 +39,7 @@ cd apps/android
 1) Start the gateway (on your main machine):
 
 ```bash
-pnpm openclaw gateway --port 18789 --verbose
+pnpm skynet gateway --port 18789 --verbose
 ```
 
 2) In the Android app:
@@ -50,8 +50,8 @@ pnpm openclaw gateway --port 18789 --verbose
 3) Approve pairing (on the gateway machine):
 
 ```bash
-openclaw nodes pending
-openclaw nodes approve <requestId>
+skynet nodes pending
+skynet nodes approve <requestId>
 ```
 
 More details: `docs/platforms/android.md`.

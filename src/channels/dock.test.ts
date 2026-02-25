@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
+import type { SkynetConfig } from "../config/config.js";
 import { getChannelDock } from "./dock.js";
 
-function emptyConfig(): OpenClawConfig {
-  return {} as OpenClawConfig;
+function emptyConfig(): SkynetConfig {
+  return {} as SkynetConfig;
 }
 
 describe("channels dock", () => {
@@ -69,7 +69,7 @@ describe("channels dock", () => {
           },
         },
       },
-    } as OpenClawConfig;
+    } as SkynetConfig;
 
     const accountDefault = ircDock?.config?.resolveDefaultTo?.({ cfg, accountId: "work" });
     const rootDefault = ircDock?.config?.resolveDefaultTo?.({ cfg, accountId: "missing" });

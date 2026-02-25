@@ -282,11 +282,11 @@ export function buildSandboxCreateArgs(params: {
 
   const createdAtMs = params.createdAtMs ?? Date.now();
   const args = ["create", "--name", params.name];
-  args.push("--label", "openclaw.sandbox=1");
-  args.push("--label", `openclaw.sessionKey=${params.scopeKey}`);
-  args.push("--label", `openclaw.createdAtMs=${createdAtMs}`);
+  args.push("--label", "skynet.sandbox=1");
+  args.push("--label", `skynet.sessionKey=${params.scopeKey}`);
+  args.push("--label", `skynet.createdAtMs=${createdAtMs}`);
   if (params.configHash) {
-    args.push("--label", `openclaw.configHash=${params.configHash}`);
+    args.push("--label", `skynet.configHash=${params.configHash}`);
   }
   for (const [key, value] of Object.entries(params.labels ?? {})) {
     if (key && value) {
@@ -415,18 +415,18 @@ async function createSandboxContainer(params: {
 }
 
 async function readContainerConfigHash(containerName: string): Promise<string | null> {
-  return await readDockerContainerLabel(containerName, "openclaw.configHash");
+  return await readDockerContainerLabel(containerName, "skynet.configHash");
 }
 
 function formatSandboxRecreateHint(params: { scope: SandboxConfig["scope"]; sessionKey: string }) {
   if (params.scope === "session") {
-    return formatCliCommand(`openclaw sandbox recreate --session ${params.sessionKey}`);
+    return formatCliCommand(`skynet sandbox recreate --session ${params.sessionKey}`);
   }
   if (params.scope === "agent") {
     const agentId = resolveSandboxAgentId(params.sessionKey) ?? "main";
-    return formatCliCommand(`openclaw sandbox recreate --agent ${agentId}`);
+    return formatCliCommand(`skynet sandbox recreate --agent ${agentId}`);
   }
-  return formatCliCommand("openclaw sandbox recreate --all");
+  return formatCliCommand("skynet sandbox recreate --all");
 }
 
 export async function ensureSandboxContainer(params: {

@@ -1,5 +1,5 @@
 import type { ChannelId } from "../../channels/plugins/types.js";
-import type { OpenClawConfig } from "../../config/config.js";
+import type { SkynetConfig } from "../../config/config.js";
 import {
   loadSessionStore,
   resolveAgentMainSessionKey,
@@ -37,7 +37,7 @@ export type DeliveryTargetResolution =
     };
 
 export async function resolveDeliveryTarget(
-  cfg: OpenClawConfig,
+  cfg: SkynetConfig,
   agentId: string,
   jobPayload: {
     channel?: "last" | ChannelId;

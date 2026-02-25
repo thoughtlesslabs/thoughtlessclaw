@@ -48,7 +48,7 @@ const dispatchInboundMessage = vi.fn(async (_params?: DispatchInboundParams) => 
 }));
 const recordInboundSession = vi.fn(async () => {});
 const readSessionUpdatedAt = vi.fn(() => undefined);
-const resolveStorePath = vi.fn(() => "/tmp/openclaw-discord-process-test-sessions.json");
+const resolveStorePath = vi.fn(() => "/tmp/skynet-discord-process-test-sessions.json");
 
 vi.mock("../send.js", () => ({
   reactMessageDiscord: sendMocks.reactMessageDiscord,
@@ -124,7 +124,7 @@ beforeEach(() => {
   });
   recordInboundSession.mockResolvedValue(undefined);
   readSessionUpdatedAt.mockReturnValue(undefined);
-  resolveStorePath.mockReturnValue("/tmp/openclaw-discord-process-test-sessions.json");
+  resolveStorePath.mockReturnValue("/tmp/skynet-discord-process-test-sessions.json");
   threadBindingTesting.resetThreadBindingsForTests();
 });
 
@@ -385,7 +385,7 @@ describe("processDiscordMessage draft streaming", () => {
     return await createBaseContext({
       cfg: {
         messages: { ackReaction: "👀" },
-        session: { store: "/tmp/openclaw-discord-process-test-sessions.json" },
+        session: { store: "/tmp/skynet-discord-process-test-sessions.json" },
         channels: {
           discord: {
             draftChunk: { minChars: 1, maxChars: 5, breakPreference: "newline" },

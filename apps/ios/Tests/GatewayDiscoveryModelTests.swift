@@ -1,5 +1,5 @@
 import Testing
-@testable import OpenClaw
+@testable import Skynet
 
 @Suite(.serialized) struct GatewayDiscoveryModelTests {
     @Test @MainActor func debugLoggingCapturesLifecycleAndResets() {

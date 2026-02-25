@@ -1,5 +1,5 @@
 import Foundation
-import OpenClawKit
+import SkynetKit
 
 @MainActor
 final class GatewayHealthMonitor {

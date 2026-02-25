@@ -1,3 +1,4 @@
+import process from "node:process";
 import type { Command } from "commander";
 import { getPrimaryCommand, hasHelpOrVersion } from "../argv.js";
 import { reparseProgramFromActionArgs } from "./action-reparse.js";
@@ -149,6 +150,19 @@ const coreEntries: CoreCliEntry[] = [
   {
     commands: [
       {
+        name: "skynet",
+        description: "Skynet autonomous architecture commands",
+        hasSubcommands: true,
+      },
+    ],
+    register: async ({ program }) => {
+      const mod = await import("./register.skynet.js");
+      mod.registerSkynetCommands(program);
+    },
+  },
+  {
+    commands: [
+      {
         name: "agent",
         description: "Run one agent turn via the Gateway",
         hasSubcommands: false,
@@ -193,7 +207,7 @@ const coreEntries: CoreCliEntry[] = [
     commands: [
       {
         name: "browser",
-        description: "Manage OpenClaw's dedicated browser (Chrome/Chromium)",
+        description: "Manage Skynet's dedicated browser (Chrome/Chromium)",
         hasSubcommands: true,
       },
     ],
@@ -247,7 +261,7 @@ function registerLazyCoreCommand(
   const placeholder = program.command(command.name).description(command.description);
   placeholder.allowUnknownOption(true);
   placeholder.allowExcessArguments(true);
-  placeholder.action(async (...actionArgs) => {
+  placeholder.action(async (...actionArgs: any[]) => {
     removeEntryCommands(program, entry);
     await entry.register({ program, ctx, argv: process.argv });
     await reparseProgramFromActionArgs(program, actionArgs);

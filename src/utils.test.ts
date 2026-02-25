@@ -51,7 +51,7 @@ describe("withWhatsAppPrefix", () => {
 
 describe("ensureDir", () => {
   it("creates nested directory", async () => {
-    await withTempDirSync("openclaw-test-", async (tmp) => {
+    await withTempDirSync("skynet-test-", async (tmp) => {
       const target = path.join(tmp, "nested", "dir");
       await ensureDir(target);
       expect(fs.existsSync(target)).toBe(true);
@@ -107,7 +107,7 @@ describe("jidToE164", () => {
   });
 
   it("maps @lid from authDir mapping files", () => {
-    withTempDirSync("openclaw-auth-", (authDir) => {
+    withTempDirSync("skynet-auth-", (authDir) => {
       const mappingPath = path.join(authDir, "lid-mapping-456_reverse.json");
       fs.writeFileSync(mappingPath, JSON.stringify("5559876"));
       expect(jidToE164("456@lid", { authDir })).toBe("+5559876");
@@ -115,7 +115,7 @@ describe("jidToE164", () => {
   });
 
   it("maps @hosted.lid from authDir mapping files", () => {
-    withTempDirSync("openclaw-auth-", (authDir) => {
+    withTempDirSync("skynet-auth-", (authDir) => {
       const mappingPath = path.join(authDir, "lid-mapping-789_reverse.json");
       fs.writeFileSync(mappingPath, JSON.stringify(4440001));
       expect(jidToE164("789@hosted.lid", { authDir })).toBe("+4440001");
@@ -127,8 +127,8 @@ describe("jidToE164", () => {
   });
 
   it("falls back through lidMappingDirs in order", () => {
-    withTempDirSync("openclaw-lid-a-", (first) => {
-      withTempDirSync("openclaw-lid-b-", (second) => {
+    withTempDirSync("skynet-lid-a-", (first) => {
+      withTempDirSync("skynet-lid-b-", (second) => {
         const mappingPath = path.join(second, "lid-mapping-321_reverse.json");
         fs.writeFileSync(mappingPath, JSON.stringify("123321"));
         expect(jidToE164("321@lid", { lidMappingDirs: [first, second] })).toBe("+123321");
@@ -138,10 +138,10 @@ describe("jidToE164", () => {
 });
 
 describe("resolveConfigDir", () => {
-  it("prefers ~/.openclaw when legacy dir is missing", async () => {
-    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "openclaw-config-dir-"));
+  it("prefers ~/.skynet when legacy dir is missing", async () => {
+    const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "skynet-config-dir-"));
     try {
-      const newDir = path.join(root, ".openclaw");
+      const newDir = path.join(root, ".skynet");
       await fs.promises.mkdir(newDir, { recursive: true });
       const resolved = resolveConfigDir({} as NodeJS.ProcessEnv, () => root);
       expect(resolved).toBe(newDir);
@@ -152,23 +152,23 @@ describe("resolveConfigDir", () => {
 });
 
 describe("resolveHomeDir", () => {
-  it("prefers OPENCLAW_HOME over HOME", () => {
-    vi.stubEnv("OPENCLAW_HOME", "/srv/openclaw-home");
+  it("prefers SKYNET_HOME over HOME", () => {
+    vi.stubEnv("SKYNET_HOME", "/srv/skynet-home");
     vi.stubEnv("HOME", "/home/other");
 
-    expect(resolveHomeDir()).toBe(path.resolve("/srv/openclaw-home"));
+    expect(resolveHomeDir()).toBe(path.resolve("/srv/skynet-home"));
 
     vi.unstubAllEnvs();
   });
 });
 
 describe("shortenHomePath", () => {
-  it("uses $OPENCLAW_HOME prefix when OPENCLAW_HOME is set", () => {
-    vi.stubEnv("OPENCLAW_HOME", "/srv/openclaw-home");
+  it("uses $SKYNET_HOME prefix when SKYNET_HOME is set", () => {
+    vi.stubEnv("SKYNET_HOME", "/srv/skynet-home");
     vi.stubEnv("HOME", "/home/other");
 
-    expect(shortenHomePath(`${path.resolve("/srv/openclaw-home")}/.openclaw/openclaw.json`)).toBe(
-      "$OPENCLAW_HOME/.openclaw/openclaw.json",
+    expect(shortenHomePath(`${path.resolve("/srv/skynet-home")}/.skynet/skynet.json`)).toBe(
+      "$SKYNET_HOME/.skynet/skynet.json",
     );
 
     vi.unstubAllEnvs();
@@ -176,13 +176,13 @@ describe("shortenHomePath", () => {
 });
 
 describe("shortenHomeInString", () => {
-  it("uses $OPENCLAW_HOME replacement when OPENCLAW_HOME is set", () => {
-    vi.stubEnv("OPENCLAW_HOME", "/srv/openclaw-home");
+  it("uses $SKYNET_HOME replacement when SKYNET_HOME is set", () => {
+    vi.stubEnv("SKYNET_HOME", "/srv/skynet-home");
     vi.stubEnv("HOME", "/home/other");
 
     expect(
-      shortenHomeInString(`config: ${path.resolve("/srv/openclaw-home")}/.openclaw/openclaw.json`),
-    ).toBe("config: $OPENCLAW_HOME/.openclaw/openclaw.json");
+      shortenHomeInString(`config: ${path.resolve("/srv/skynet-home")}/.skynet/skynet.json`),
+    ).toBe("config: $SKYNET_HOME/.skynet/skynet.json");
 
     vi.unstubAllEnvs();
   });
@@ -220,18 +220,18 @@ describe("resolveUserPath", () => {
   });
 
   it("expands ~/ to home dir", () => {
-    expect(resolveUserPath("~/openclaw")).toBe(path.resolve(os.homedir(), "openclaw"));
+    expect(resolveUserPath("~/skynet")).toBe(path.resolve(os.homedir(), "skynet"));
   });
 
   it("resolves relative paths", () => {
     expect(resolveUserPath("tmp/dir")).toBe(path.resolve("tmp/dir"));
   });
 
-  it("prefers OPENCLAW_HOME for tilde expansion", () => {
-    vi.stubEnv("OPENCLAW_HOME", "/srv/openclaw-home");
+  it("prefers SKYNET_HOME for tilde expansion", () => {
+    vi.stubEnv("SKYNET_HOME", "/srv/skynet-home");
     vi.stubEnv("HOME", "/home/other");
 
-    expect(resolveUserPath("~/openclaw")).toBe(path.resolve("/srv/openclaw-home", "openclaw"));
+    expect(resolveUserPath("~/skynet")).toBe(path.resolve("/srv/skynet-home", "skynet"));
 
     vi.unstubAllEnvs();
   });
