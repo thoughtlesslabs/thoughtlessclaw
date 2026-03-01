@@ -240,7 +240,7 @@ export function resolveAgentWorkspaceDir(cfg: SkynetConfig, agentId: string) {
     return stripNullBytes(resolveDefaultAgentWorkspaceDir(process.env));
   }
   const stateDir = resolveStateDir(process.env);
-  return stripNullBytes(path.join(stateDir, `workspace-${id}`));
+  return stripNullBytes(path.join(stateDir, "vault", "agents", id));
 }
 
 export function resolveAgentDir(cfg: SkynetConfig, agentId: string) {
