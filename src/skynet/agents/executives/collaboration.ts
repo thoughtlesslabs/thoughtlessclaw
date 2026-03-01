@@ -219,6 +219,7 @@ REASON: <Provide brief, actionable feedback or improvements based on your role>`
           sessionId,
           sessionFile,
           workspaceDir,
+          messageChannel: "governance",
           prompt,
           extraSystemPrompt: agent.getSystemPrompt(),
           runId: `proposal-${proposalId}-${exec}`,

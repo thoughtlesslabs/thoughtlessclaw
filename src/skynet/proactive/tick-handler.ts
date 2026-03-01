@@ -154,6 +154,41 @@ export class TickHandlerRegistry {
       const DORMANT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
       const now = Date.now();
 
+      // Check executives
+      const executives = ["main", "oversight", "monitor", "optimizer"];
+      for (const exec of executives) {
+        const statePath = `agents/${exec}/state.json`;
+        const state = await vaultMgr.read(statePath);
+        if (!state) {
+          continue;
+        }
+
+        const lastActivity = state.lastWake || state.updatedAt || 0;
+        if (now - lastActivity > DORMANT_TIMEOUT_MS) {
+          console.log(`[dormant-check] Waking dormant executive: ${exec}`);
+          try {
+            const { callGateway } = await import("../../gateway/call.js");
+            // The governance tool ensures `messages` context is pulled for them correctly.
+            // We ping them on the explicitly labeled governance channel, avoiding the default 'heartbeat' label.
+            await callGateway({
+              method: "agent",
+              params: {
+                sessionKey: exec,
+                message: `DORMANT-CHECK: You have received an automated watchdog ping from the Nervous System. 1. Run governance(poll-events) to check for pending escalations, decisions, or Nervous System events addressed to you. 2. If escalation events exist: respond using governance(create-decision) with your decision, then governance(propagate-decision) to route it back. 3. If tasks exist in your Vault project: continue working and output DONE:, ERRORS:, or BLOCKER: when appropriate. 4. If nothing is pending: reply HEARTBEAT_OK.`,
+                idempotencyKey: `wake-executive-${exec}-${Date.now()}`,
+                label: `Executive: ${exec}`,
+                messageChannel: "governance",
+              },
+              timeoutMs: 30000,
+            });
+            state.lastWake = now;
+            await vaultMgr.write(statePath, state);
+          } catch (err) {
+            console.error(`[dormant-check] Failed to wake executive ${exec}:`, err);
+          }
+        }
+      }
+
       // Check managers
       const projectNames = await vaultMgr.listProjects();
       for (const projectName of projectNames) {

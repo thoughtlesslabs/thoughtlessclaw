@@ -168,6 +168,7 @@ export class VaultManager {
         projectName: "system",
         projectType: "system",
         status: "active",
+        agentSessionId: "agent:manager-system:main",
         currentTaskId: null,
         activeWorkers: [],
         completedTasks: 0,
@@ -422,7 +423,11 @@ export class VaultManager {
     }
   }
 
-  async createProjectManager(projectName: string, managerId: string): Promise<ProjectManagerState> {
+  async createProjectManager(
+    projectName: string,
+    managerId: string,
+    agentSessionId?: string,
+  ): Promise<ProjectManagerState> {
     const managerAgentPath = path.join(this.basePath, `agents/manager-${projectName}`);
     await fs.mkdir(managerAgentPath, { recursive: true });
 
@@ -496,6 +501,7 @@ If blocked: use \`governance(ask-executive)\` — this writes to the Vault and a
       projectName,
       projectType: "project" as const,
       status: "active" as const,
+      agentSessionId,
       currentTaskId: null,
       activeWorkers: [],
       completedTasks: 0,

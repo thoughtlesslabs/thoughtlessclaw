@@ -192,7 +192,11 @@ ${new Date().toISOString()}
   }
 
   async initialize(): Promise<void> {
-    await this.vault.createProjectManager(this.config.projectName, this.managerId);
+    await this.vault.createProjectManager(
+      this.config.projectName,
+      this.managerId,
+      this.config.agentSessionId,
+    );
     this.state.status = "active";
     await this.saveState();
   }

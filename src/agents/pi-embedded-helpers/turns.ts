@@ -97,12 +97,45 @@ export function mergeConsecutiveUserTurns(
 /**
  * Validates and fixes conversation turn sequences for Anthropic API.
  * Anthropic requires strict alternating user→assistant pattern.
- * Merges consecutive user messages together.
+ * Merges consecutive user messages together and drops empty text blocks.
  */
 export function validateAnthropicTurns(messages: AgentMessage[]): AgentMessage[] {
-  return validateTurnsWithConsecutiveMerge({
+  const merged = validateTurnsWithConsecutiveMerge({
     messages,
     role: "user",
     merge: mergeConsecutiveUserTurns,
+  });
+
+  // Anthropic API throws 400 if a text block contains only empty string.
+  // We filter out any empty text blocks from the content arrays.
+  return merged.map((msg) => {
+    if (!msg || typeof msg !== "object") {
+      return msg;
+    }
+
+    // Some message types like BashExecutionMessage don't have content arrays natively in the core union
+    const msgWithContent = msg as Extract<AgentMessage, { content?: unknown }>;
+    if (!Array.isArray(msgWithContent.content)) {
+      return msg;
+    }
+
+    const filteredContent = msgWithContent.content.filter((block: unknown) => {
+      if (!block || typeof block !== "object") {
+        return true;
+      }
+      const rec = block as { type?: unknown; text?: unknown };
+      if (rec.type === "text" && typeof rec.text === "string" && rec.text.trim() === "") {
+        return false;
+      }
+      return true;
+    });
+
+    // If we filtered out all blocks, keep at least one placeholder so the message isn't empty
+    // (though in practice it should have an image or we'd just drop the message entirely).
+    if (filteredContent.length === 0 && msgWithContent.content.length > 0) {
+      filteredContent.push({ type: "text", text: "(empty)" });
+    }
+
+    return { ...msg, content: filteredContent } as unknown as AgentMessage;
   });
 }
