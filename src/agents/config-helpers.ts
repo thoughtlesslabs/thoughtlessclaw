@@ -18,8 +18,8 @@ export async function addAgentToConfig(agentId: string, workspacePath: string): 
     return;
   }
 
-  const resolvedPath = workspacePath.startsWith("~")
-    ? resolve(os.homedir(), workspacePath.slice(1))
+  const resolvedPath = workspacePath.startsWith("~/")
+    ? resolve(os.homedir(), workspacePath.slice(2))
     : workspacePath;
 
   const newAgent = {
@@ -54,8 +54,8 @@ export async function ensureAgentInConfig(agentId: string, workspacePath: string
   const existing = agents.find((a) => a?.id === agentId);
 
   if (existing) {
-    const resolvedPath = workspacePath.startsWith("~")
-      ? resolve(os.homedir(), workspacePath.slice(1))
+    const resolvedPath = workspacePath.startsWith("~/")
+      ? resolve(os.homedir(), workspacePath.slice(2))
       : workspacePath;
 
     if (existing.workspace !== resolvedPath) {

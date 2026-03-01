@@ -348,7 +348,7 @@ export function createGovernanceTool(): AnyAgentTool {
             // Ensure config
             const vaultPath = "~/.skynet/vault";
             const workerAgentId = `worker:${workerType}`;
-            const workerWorkspace = `${vaultPath}/agents/worker-${workerId}`;
+            const workerWorkspace = `${vaultPath}/agents/${workerId}`;
             try {
               await ensureAgentInConfig(workerAgentId, workerWorkspace);
             } catch {}
@@ -488,7 +488,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const state = manager.getStatus();
 
             // Add manager to config with workspace
-            const vaultPath = "~/.skynet/vault";
+            const vaultPath = vault.getBasePath();
             const managerWorkspace = `${vaultPath}/agents/manager-${projectName}`;
             await ensureAgentInConfig(`manager:${projectName}`, managerWorkspace);
 
