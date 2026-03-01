@@ -1393,15 +1393,23 @@ The Interceptor will catch your trigger line and handle everything automatically
               if (!task) {
                 continue;
               }
-              if (
-                (task.assignee &&
-                  typeof task.assignee === "string" &&
-                  task.assignee.includes(projectName)) ||
-                (task.metadata &&
-                  typeof task.metadata === "object" &&
-                  "projectName" in task.metadata &&
-                  task.metadata.projectName === projectName)
-              ) {
+              // A task belongs to this project if its assignee explicitly binds to the manager
+              // (e.g. "manager-system", "manager-system-123456", or "system")
+              // or if the metadata explicitly tags it.
+              const isAssigneeMatch =
+                typeof task.assignee === "string" &&
+                (task.assignee === `manager-${projectName}` ||
+                  task.assignee.startsWith(`manager-${projectName}-`) ||
+                  task.assignee === projectName ||
+                  task.assignee.includes(manager.id as string));
+
+              const isMetadataMatch =
+                task.metadata &&
+                typeof task.metadata === "object" &&
+                "projectName" in task.metadata &&
+                task.metadata.projectName === projectName;
+
+              if (isAssigneeMatch || isMetadataMatch) {
                 projectTasks.push({
                   id: task.id as string,
                   title: task.title as string,
@@ -1710,10 +1718,24 @@ The Interceptor will catch your trigger line and handle everything automatically
               pendingTasks: tasks.filter((t) => {
                 const task = vault.read(t).catch(() => null);
                 return task && task.then
-                  ? task.then(
-                      (t: unknown) =>
-                        t && typeof t === "object" && "status" in t && t.status === "pending",
-                    )
+                  ? task.then((t: unknown) => {
+                      if (!t || typeof t !== "object" || !("status" in t)) {
+                        return false;
+                      }
+                      if (t.status !== "pending") {
+                        return false;
+                      }
+                      // Count it as pending if it's assigned to any valid manager format
+                      const assignee =
+                        "assignee" in t && typeof t.assignee === "string" ? t.assignee : "";
+                      return (
+                        assignee.startsWith("manager-") ||
+                        ("metadata" in t &&
+                          typeof t.metadata === "object" &&
+                          t.metadata &&
+                          "projectName" in t.metadata)
+                      );
+                    })
                   : false;
               }).length,
               timestamp: Date.now(),

@@ -80,6 +80,9 @@ export class Skynet {
 
     try {
       const projectDirs = await this.vault.listProjects();
+      if (!projectDirs.includes("system")) {
+        projectDirs.push("system");
+      }
       const sessionsToSave: Array<{ projectName: string; sessionKey: string }> = [];
 
       for (const projectName of projectDirs) {

@@ -5,6 +5,7 @@ export interface ProjectManagerConfig {
   projectName: string;
   description?: string;
   projectType: "system" | "project";
+  agentSessionId?: string;
 }
 
 export class ProjectManager {
@@ -36,6 +37,7 @@ export class ProjectManager {
       totalTasks: 0,
       lastCheckIn: Date.now(),
       blockers: [],
+      agentSessionId: config.agentSessionId,
     };
   }
 
@@ -426,11 +428,13 @@ export function createProjectManager(
   projectName: string,
   description?: string,
   projectType: "system" | "project" = "project",
+  agentSessionId?: string,
 ): ProjectManager {
   const config: ProjectManagerConfig = {
     projectName,
     description,
     projectType,
+    agentSessionId,
   };
   return new ProjectManager(vault, config);
 }
@@ -441,5 +445,6 @@ export function createSystemManager(vault: VaultManager): ProjectManager {
     "system",
     "System infrastructure and self-maintenance",
     "system",
+    "agent:manager-system:main",
   );
 }
