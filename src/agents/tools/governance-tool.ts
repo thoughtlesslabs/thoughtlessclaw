@@ -345,13 +345,10 @@ export function createGovernanceTool(): AnyAgentTool {
               sessionId: null as string | null,
             };
 
-            // Ensure config
-            const vaultPath = "~/.skynet/vault";
-            const workerAgentId = `worker:${workerType}`;
-            const workerWorkspace = `${vaultPath}/agents/${workerId}`;
-            try {
-              await ensureAgentInConfig(workerAgentId, workerWorkspace);
-            } catch {}
+            // Dynamic workspace isolation
+            const vaultPath = vault.getBasePath();
+            const workerAgentAlias = `worker:${workerType}`;
+            const workerWorkspace = `${vaultPath}/projects/${projectName}/workers/${workerId}`;
 
             await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
 
@@ -385,10 +382,11 @@ The Interceptor will catch your trigger line and handle everything automatically
               const spawnResult = await spawnSubagentDirect(
                 {
                   task: taskPrompt,
-                  agentId: workerAgentId,
+                  agentId: workerAgentAlias,
                   mode: "run",
                   label: `${projectName}-${workerType}`,
                   runTimeoutSeconds: 600,
+                  workspaceDir: workerWorkspace,
                 },
                 { agentSessionKey: "agent:main", requesterAgentIdOverride: "main" },
               );
