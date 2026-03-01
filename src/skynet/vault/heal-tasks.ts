@@ -24,9 +24,10 @@ async function run() {
 
     if (configData.agents && Array.isArray(configData.agents.list)) {
       const originalLen = configData.agents.list.length;
-      configData.agents.list = configData.agents.list.filter(
-        (a: { id?: string }) => !a.id?.startsWith("worker-") && !a.id?.startsWith("worker:"),
-      );
+      configData.agents.list = configData.agents.list.filter((a: unknown) => {
+        const agent = a as { id?: string };
+        return !agent.id?.startsWith("worker-") && !agent.id?.startsWith("worker:");
+      });
       if (configData.agents.list.length !== originalLen) {
         configChanged = true;
         console.log(
@@ -34,19 +35,20 @@ async function run() {
         );
       }
 
-      // Clean allowAgents inside main
+      // Clean allowAgents inside main - Only remove the legacy worker-* formats. Keep worker:
       const mainAgent = configData.agents.list.find(
-        (a: { id?: string; subagents?: { allowAgents?: string[] } }) => a.id === "main",
-      );
+        (a: unknown) => (a as { id?: string }).id === "main",
+      ) as { id: string; subagents?: { allowAgents?: string[] } } | undefined;
+
       if (mainAgent?.subagents?.allowAgents) {
         const allowLen = mainAgent.subagents.allowAgents.length;
         mainAgent.subagents.allowAgents = mainAgent.subagents.allowAgents.filter(
-          (id: string) => !id.startsWith("worker-") && !id.startsWith("worker:"),
+          (id: string) => !id.startsWith("worker-"),
         );
         if (mainAgent.subagents.allowAgents.length !== allowLen) {
           configChanged = true;
           console.log(
-            `Cleaned ${allowLen - mainAgent.subagents.allowAgents.length} worker entries from main allowAgents`,
+            `Cleaned ${allowLen - mainAgent.subagents.allowAgents.length} legacy worker-* entries from main allowAgents`,
           );
         }
       }
@@ -56,7 +58,7 @@ async function run() {
       await fs.writeFile(skynetJsonPath, JSON.stringify(configData, null, 2));
       console.log(`Successfully saved cleaned skynet.json`);
     } else {
-      console.log(`skynet.json looks clean, no worker entries found.`);
+      console.log(`skynet.json looks clean, no legacy worker entries found.`);
     }
   } catch (err) {
     console.warn(`Could not process skynet.json (might not exist):`, err);
@@ -76,6 +78,51 @@ async function run() {
     console.log(`Deleted ${deletedWorkers} orphaned worker agent directories.`);
   } catch (err) {
     console.warn(`Could not process vault/agents:`, err);
+  }
+
+  // 2.5 Clean Virtual Worker Directories
+  try {
+    const projectsDir = path.join(vaultPath, "projects");
+    const projects = await fs.readdir(projectsDir).catch(() => []);
+    let deletedVirtualWorkers = 0;
+
+    for (const proj of projects) {
+      const workersDir = path.join(projectsDir, proj, "workers");
+      const workers = await fs.readdir(workersDir).catch(() => []);
+      for (const w of workers) {
+        await fs.rm(path.join(workersDir, w), { recursive: true, force: true });
+        deletedVirtualWorkers++;
+      }
+
+      // Re-sync manager states
+      const managerJsonPath = path.join(projectsDir, proj, "manager.json");
+      try {
+        const managerData = JSON.parse(await fs.readFile(managerJsonPath, "utf-8"));
+        let mgrChanged = false;
+        if (
+          managerData &&
+          Array.isArray(managerData.activeWorkers) &&
+          managerData.activeWorkers.length > 0
+        ) {
+          managerData.activeWorkers = [];
+          mgrChanged = true;
+        }
+        if (managerData && managerData.currentTaskId) {
+          managerData.currentTaskId = null;
+          mgrChanged = true;
+        }
+        if (mgrChanged) {
+          await fs.writeFile(managerJsonPath, JSON.stringify(managerData, null, 2));
+        }
+      } catch {
+        // Ignore if manager.json doesn't exist
+      }
+    }
+    console.log(
+      `Deleted ${deletedVirtualWorkers} ephemeral virtual worker directories and reset project manager states.`,
+    );
+  } catch (err) {
+    console.warn(`Could not process vault/projects:`, err);
   }
 
   // 3. Clean Accidentally Nested Vault Paths
@@ -133,6 +180,69 @@ async function run() {
     );
   } catch (err) {
     console.error("Error healing tasks:", err);
+  }
+  // 5. Clean Transcripts (Remove empty text blocks that crash Anthropic)
+  try {
+    const agentsDir = path.join(vaultPath, "agents");
+    const agentDirs = await fs.readdir(agentsDir).catch(() => []);
+    let sanitizedCount = 0;
+
+    for (const d of agentDirs) {
+      const sessionsDir = path.join(agentsDir, d, "sessions");
+      const sessions = await fs.readdir(sessionsDir).catch(() => []);
+      for (const s of sessions) {
+        if (!s.endsWith(".jsonl")) {
+          continue;
+        }
+        const filePath = path.join(sessionsDir, s);
+
+        let fileContent = await fs.readFile(filePath, "utf-8");
+        const lines = fileContent.split(/\r?\n/);
+        let changed = false;
+
+        const newLines = lines.map((line) => {
+          if (!line.trim()) {
+            return line;
+          }
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed?.message?.content && Array.isArray(parsed.message.content)) {
+              let contentChanged = false;
+              const newContent = parsed.message.content.map(
+                (block: { type?: string; text?: unknown }) => {
+                  if (
+                    block.type === "text" &&
+                    typeof block.text === "string" &&
+                    block.text.trim() === ""
+                  ) {
+                    contentChanged = true;
+                    return { ...block, text: "[empty text fixed]" };
+                  }
+                  return block;
+                },
+              );
+
+              if (contentChanged) {
+                changed = true;
+                parsed.message.content = newContent;
+                return JSON.stringify(parsed);
+              }
+            }
+          } catch {
+            // ignore bad lines
+          }
+          return line;
+        });
+
+        if (changed) {
+          await fs.writeFile(filePath, newLines.join("\n"));
+          sanitizedCount++;
+        }
+      }
+    }
+    console.log(`Cleaned ${sanitizedCount} transcript files containing empty text blocks.`);
+  } catch (err) {
+    console.warn(`Could not process transcripts:`, err);
   }
 }
 

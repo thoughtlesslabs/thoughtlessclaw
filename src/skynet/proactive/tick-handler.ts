@@ -81,6 +81,68 @@ export class TickHandlerRegistry {
     const vault = (await this.getVault()) as import("../vault/manager.js").VaultManager;
     const { createFailoverProbeHandler } = await import("./failover-probe.js");
     this.handlers.set("failover-probe", createFailoverProbeHandler(vault));
+
+    this.handlers.set("provider-health", {
+      name: "provider-health",
+      description: "Dump active provider auth states to a shared JSON cache for pre-flight checks",
+      intervalMs: 30000,
+      lastRun: 0,
+      enabled: true,
+      run: async () => {
+        await this.runProviderHealthSync();
+      },
+    });
+  }
+
+  private async runProviderHealthSync(): Promise<void> {
+    try {
+      const { resolveAuthStorePath } = await import("../../agents/auth-profiles/paths.js");
+      const { loadAuthProfileStore } = await import("../../agents/auth-profiles/store.js");
+      const { resolveUserPath } = await import("../../utils.js");
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+
+      const storePath = resolveAuthStorePath();
+      const store = loadAuthProfileStore(storePath);
+
+      const healthData: Record<
+        string,
+        { provider: string; model?: string; status: "healthy" | "cooldown" | "half-open" }
+      > = {};
+
+      const now = Date.now();
+
+      Object.entries(store.usageStats || {}).forEach(([profileId, stats]) => {
+        const credential = store.profiles[profileId];
+        if (!credential) {
+          return;
+        }
+
+        let status: "healthy" | "cooldown" | "half-open" = "healthy";
+
+        if (stats.halfOpenActive) {
+          status = "half-open";
+        } else if (stats.disabledUntil && stats.disabledUntil > now) {
+          status = "cooldown";
+        } else if (stats.cooldownUntil && stats.cooldownUntil > now) {
+          status = "cooldown";
+        }
+
+        healthData[profileId] = {
+          provider: credential.provider,
+          // Extract model from profile ID if it follows formatting style "provider:model"
+          model: profileId.includes(":") ? profileId.split(":")[1] : undefined,
+          status,
+        };
+      });
+
+      const skynetDir = resolveUserPath("~/.skynet");
+      const outPath = path.join(skynetDir, "provider-health.json");
+
+      await fs.writeFile(outPath, JSON.stringify(healthData, null, 2));
+    } catch (e) {
+      console.error("[provider-health] Failed to sync provider health stats:", e);
+    }
   }
 
   private async runDormantCheck(): Promise<void> {

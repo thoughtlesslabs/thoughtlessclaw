@@ -677,8 +677,24 @@ export async function runReplyAgent(params: {
         defaultRuntime.error?.(
           `Nervous System: agent ${sessionKey} failed to call governance or ping, and triggered no physical physical hooks. Penalizing.`,
         );
+
+        // Record Violation for RL
+        try {
+          const { createViolationTracker } = await import("../../skynet/violations/tracker.js");
+          const { resolveUserPath } = await import("../../utils.js");
+          const tracker = createViolationTracker(resolveUserPath("~/.skynet/vault/"));
+          await tracker.recordViolation(
+            sessionKey,
+            "governance",
+            "Agent ended turn without invoking a governance tool or physical hook.",
+            "major",
+          );
+        } catch (err) {
+          defaultRuntime.error?.(`Failed to log RL violation:`, err);
+        }
+
         enqueueSystemEvent(
-          "[NERVOUS_SYSTEM] Action blocked by Governance. No governance tool called. You are penalized for breaking protocol. Please call the governance tool with an appropriate action before ending your turn.",
+          "[NERVOUS_SYSTEM] Action blocked by Governance. No governance tool called. You are penalized -10 reward points for breaking protocol. Please call the governance tool with an appropriate action before ending your turn.",
           { sessionKey },
         );
         const penaltyRun: FollowupRun = {

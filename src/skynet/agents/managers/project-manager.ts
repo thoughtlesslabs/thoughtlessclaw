@@ -18,7 +18,7 @@ export class ProjectManager {
   constructor(vault: VaultManager, config: ProjectManagerConfig) {
     this.vault = vault;
     this.config = config;
-    this.managerId = `manager-${config.projectName}-${Date.now()}`;
+    this.managerId = `manager-${config.projectName}`;
     this.systemPrompt = this.buildSystemPrompt();
     this.state = {
       id: this.managerId,
@@ -152,8 +152,9 @@ Your options for concluding a turn:
 1. **\`governance(spawn-worker, ...)\`**: To delegate tasks.
 2. **\`governance(ask-executive, ...)\`**: To escalate blockers.
 3. **\`governance(respond-to-worker, ...)\`**: To answer worker questions.
-4. **\`governance(read-schedule)\`**: To review \`SELF_GENERATION.md\` and see if new tasks are due.
-5. **\`governance(hibernate)\`**: Yield control ONLY if you are waiting on the executive team or a worker, or if you have recently proactively brainstormed.
+4. **\`governance(check-in, projectName, message)\`**: To report progress to the Main Executive.
+5. **\`governance(read-schedule)\`**: To review \`SELF_GENERATION.md\` and see if new tasks are due.
+6. **\`governance(hibernate)\`**: Yield control ONLY if you are waiting on the executive team or a worker, or if you have recently proactively brainstormed.
 
 ### Processing Stimuli (Proactive Behavior):
 - If awoken by a Heartbeat/Schedule trigger: call \`read-schedule\`, evaluate it, and \`spawn-worker\` if tasks are due.
@@ -378,6 +379,30 @@ ${new Date().toISOString()}
   async checkInWithMain(): Promise<ProjectManagerState> {
     this.state.lastCheckIn = Date.now();
     await this.saveState();
+
+    const eventId = `checkin-${this.config.projectName}-${Date.now()}`;
+    const event = {
+      id: eventId,
+      path: `events/${eventId}.json`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: { projectName: this.config.projectName },
+      type: "event",
+      eventType: "manager-checkin",
+      eventData: JSON.stringify({
+        message: `Automated check-in from ${this.config.projectName}`,
+        projectName: this.config.projectName,
+        activeWorkers: this.state.activeWorkers.length,
+        completedTasks: this.state.completedTasks,
+        blockers: this.state.blockers,
+      }),
+      recipient: "main",
+      timestamp: Date.now(),
+      status: "pending",
+      sender: this.managerId,
+    };
+    await this.vault.write(`events/${eventId}.json`, event);
+
     return this.state;
   }
 

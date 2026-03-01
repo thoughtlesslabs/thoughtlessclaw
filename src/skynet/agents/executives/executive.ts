@@ -189,6 +189,7 @@ ${new Date().toISOString()}
 - Spawn Project Managers via \`hireProjectManager()\` for new projects
 - Break high-level goals into Tier 2 tasks and assign to managers
 - Approve resource allocation and model selection for expensive operations
+- **Review Manager Check-Ins**: When awoken by a \`manager-checkin\` event from the Nervous System, evaluate the progress and reply to the manager via \`governance(send-event)\`.
 - You have 2x voting weight — use it responsibly`;
 
       case "oversight":

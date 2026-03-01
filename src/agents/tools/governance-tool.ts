@@ -127,6 +127,8 @@ const GovernanceConsultSchema = Type.Object({
     Type.Literal("propagate-decision"),
     Type.Literal("check-permission"),
     Type.Literal("request-permission"),
+    Type.Literal("check-in"),
+    Type.Literal("health-summary"),
   ]),
   request: Type.Optional(Type.String()),
   plan: Type.Optional(Type.String()),
@@ -181,6 +183,7 @@ const GovernanceConsultSchema = Type.Object({
   escalationPath: Type.Optional(Type.String()),
   decision: Type.Optional(Type.String()),
   sender: Type.Optional(Type.String()),
+  message: Type.Optional(Type.String()),
 });
 
 export function createGovernanceTool(): AnyAgentTool {
@@ -228,6 +231,98 @@ export function createGovernanceTool(): AnyAgentTool {
             return jsonResult({ success: true, type: "vote", result });
           }
 
+          case "health-summary": {
+            // 1. Get Models Health
+            let modelsHealth = "Offline/Unknown";
+            try {
+              const { resolveUserPath } = await import("../../utils.js");
+              const fs = await import("node:fs/promises");
+              const path = await import("node:path");
+              const healthPath = path.join(resolveUserPath("~/.skynet"), "provider-health.json");
+              if (
+                await fs
+                  .stat(healthPath)
+                  .then(() => true)
+                  .catch(() => false)
+              ) {
+                const rawHealth = await fs.readFile(healthPath, "utf-8");
+                const healthData = JSON.parse(rawHealth) as Record<
+                  string,
+                  { provider: string; model?: string; status: string }
+                >;
+
+                const lines = Object.entries(healthData).map(([, data]) => {
+                  const icon =
+                    data.status === "healthy" ? "✅" : data.status === "half-open" ? "⚠️" : "❌";
+                  return `${icon} **${data.provider}** (${data.model || "default"}): ${data.status}`;
+                });
+                modelsHealth =
+                  lines.length > 0 ? lines.join("\n") : "No routing profiles configured.";
+              }
+            } catch {
+              modelsHealth = "Failed to load provider health cache.";
+            }
+
+            // 2. Get active blockers from all projects
+            let activeBlockers = [];
+            let totalWorkers = 0;
+            let totalTasks = 0;
+            let pendingTasks = 0;
+
+            const projects = await vault.listDirs("projects/").catch(() => [] as string[]);
+            for (const proj of projects) {
+              const mgr = (await vault
+                .read(`projects/${proj}/manager.json`)
+                .catch(() => null)) as unknown as
+                | import("../../skynet/vault/types.js").ProjectManagerState
+                | null;
+              if (mgr && mgr.blockers && Array.isArray(mgr.blockers) && mgr.blockers.length > 0) {
+                activeBlockers.push(...mgr.blockers);
+              }
+              if (mgr && Array.isArray(mgr.activeWorkers)) {
+                totalWorkers += mgr.activeWorkers.length;
+              }
+
+              const tasks = await vault.list(`projects/${proj}/tasks/`).catch(() => [] as string[]);
+              totalTasks += tasks.length;
+              for (const tf of tasks) {
+                if (!tf.endsWith(".json")) {
+                  continue;
+                }
+                const task = (await vault
+                  .read(`projects/${proj}/tasks/${tf}`)
+                  .catch(() => null)) as unknown as
+                  | import("../../skynet/vault/types.js").TaskEntry
+                  | null;
+                if (task && task.status !== "completed") {
+                  pendingTasks++;
+                }
+              }
+            }
+
+            const unassignedQueue = await vault.list("tasks/").catch(() => [] as string[]);
+            totalTasks += unassignedQueue.length;
+            pendingTasks += unassignedQueue.length; // Unassigned are pending
+
+            const dashboard = `# System Health Summary
+
+## Model Infrastructure
+${modelsHealth}
+
+## Capacity
+- **Active Workers:** ${totalWorkers}
+- **Task Backlog:** ${pendingTasks} pending / ${totalTasks} total tasks
+
+## Global Blockers
+${
+  activeBlockers.length > 0
+    ? activeBlockers.map((b) => `- ${b}`).join("\n")
+    : "✅ No active blockers reported by Project Managers."
+}
+`;
+            return jsonResult({ success: true, type: "health-summary", report: dashboard });
+          }
+
           case "spawn-worker": {
             const workerType = params.workerType as keyof typeof WORKER_CONFIGS;
             const taskDescription = params.taskDescription as string;
@@ -242,6 +337,39 @@ export function createGovernanceTool(): AnyAgentTool {
             if (!WORKER_CONFIGS[workerType]) {
               return jsonResult({ success: false, error: `Unknown worker type: ${workerType}` });
             }
+
+            // --- Pre-Flight Model Health Check ---
+            try {
+              const { resolveUserPath } = await import("../../utils.js");
+              const fs = await import("node:fs/promises");
+              const path = await import("node:path");
+              const healthPath = path.join(resolveUserPath("~/.skynet"), "provider-health.json");
+
+              if (
+                await fs
+                  .stat(healthPath)
+                  .then(() => true)
+                  .catch(() => false)
+              ) {
+                const rawHealth = await fs.readFile(healthPath, "utf-8");
+                const healthData = JSON.parse(rawHealth) as Record<string, { status: string }>;
+                const hasAvailableProvider = Object.values(healthData).some(
+                  (p) => p.status === "healthy" || p.status === "half-open",
+                );
+
+                if (!hasAvailableProvider && Object.keys(healthData).length > 0) {
+                  return jsonResult({
+                    success: false,
+                    error:
+                      "Provider Cooldown: All routing models are currently rate-limited. Yield control (hibernate) and try again later.",
+                  });
+                }
+              }
+            } catch {
+              // Non-fatal if health file isn't ready
+            }
+            // -------------------------------------
+
             // Check executive approval / reinforcement learning first for spawning workers
             const patternLearner = getPatternLearner(
               vault as unknown as import("../../skynet/vault/manager.js").VaultManager,
@@ -395,8 +523,8 @@ The Interceptor will catch your trigger line and handle everything automatically
                 workerState.sessionId = spawnResult.childSessionKey;
                 await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
               }
-            } catch (e) {
-              console.log("Failed to spawn worker subagent", e);
+            } catch {
+              console.log("Failed to spawn worker subagent");
             }
 
             return jsonResult({
@@ -594,6 +722,44 @@ The Interceptor will catch your trigger line and handle everything automatically
               success: true,
               type: "no-tasks",
               message: "No pending tasks available",
+            });
+          }
+
+          case "check-in": {
+            const projectName = params.projectName as string;
+            const message = params.message as string;
+            if (!projectName || !message) {
+              return jsonResult({ success: false, error: "projectName and message required" });
+            }
+
+            const eventId = `checkin-${projectName}-${Date.now()}`;
+            const event = {
+              id: eventId,
+              path: `events/${eventId}.json`,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              metadata: { projectName },
+              type: "event",
+              eventType: "manager-checkin",
+              eventData: JSON.stringify({ message, projectName }),
+              recipient: "main",
+              timestamp: Date.now(),
+              status: "pending",
+              sender: `manager-${projectName}`,
+            };
+            await vault.write(`events/${eventId}.json`, event);
+
+            // Wake main to process the check-in immediately
+            try {
+              requestHeartbeatNow({ reason: "manager-checkin", agentId: "main" });
+            } catch {
+              // best effort
+            }
+
+            return jsonResult({
+              success: true,
+              type: "check-in-sent",
+              directive: "[NERVOUS_SYSTEM] Check-in delivered to Main Executive.",
             });
           }
 

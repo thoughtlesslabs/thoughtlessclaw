@@ -7,7 +7,8 @@ export type ContractType =
   | "artifact_logging"
   | "timeout"
   | "vault_first"
-  | "approval_required";
+  | "approval_required"
+  | "governance";
 
 export interface ViolationRule {
   type: ContractType;
@@ -41,6 +42,11 @@ export const CONTRACT_RULES: Record<ContractType, ViolationRule> = {
     type: "approval_required",
     description: "High-risk actions require Triad Council approval",
     penalty: 25,
+  },
+  governance: {
+    type: "governance",
+    description: "Turn MUST conclude by calling a governance tool or physical hook",
+    penalty: 10,
   },
 };
 
