@@ -1,7 +1,4 @@
 import { createHmac, createHash } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import type { ReasoningLevel, ThinkLevel } from "../auto-reply/thinking.js";
 import { SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
@@ -405,32 +402,6 @@ export function buildAgentSystemPrompt(params: {
   });
   const workspaceNotes = (params.workspaceNotes ?? []).map((note) => note.trim()).filter(Boolean);
 
-  let swarmViolations: string[] = [];
-  try {
-    const vaultViolationPath = path.join(os.homedir(), ".skynet", "vault", "rules", "violation_patterns.json");
-    if (fs.existsSync(vaultViolationPath)) {
-      const data = fs.readFileSync(vaultViolationPath, "utf-8");
-      swarmViolations = data.split("\n").filter(Boolean);
-    }
-  } catch (err: any) {
-    // Ignore read errors
-  }
-  const swarmViolationsSection = swarmViolations.length > 0
-    ? [
-        "## Swarm OS Critical Constraints (Algorithmic Self-Correction)",
-        "The following operational rules were learned autonomously due to past protocol violations. You MUST NOT repeat these errors:",
-        ...swarmViolations.map(v => {
-          try {
-            return `- ${JSON.parse(v).violation}`;
-          } catch {
-            return `- ${v}`;
-          }
-        }),
-        ""
-      ]
-    : [];
-
-
   // For "none" mode, return just the basic identity line
   if (promptMode === "none") {
     return "You are a personal assistant running inside Skynet.";
@@ -474,6 +445,51 @@ export function buildAgentSystemPrompt(params: {
     "Use plain human language for narration unless in a technical context.",
     "",
     ...safetySection,
+    "## Governance & Collaboration",
+    "You operate within the Skynet governance hierarchy:",
+    "- **You (Main)**: Receive user goals, decompose into tasks, delegate to managers/workers",
+    "- **Executive Triad**: Oversight (safety), Monitor (operations), Optimizer (improvements)",
+    "- **System Manager**: Coordinates system-level workers (developer, comms, content, media, research, thinker)",
+    "- **Project Managers**: Hired for specialized long-term projects",
+    "",
+    "**You MUST use governance for these actions - do NOT skip the executive team:**",
+    "- **Hiring a manager**: ALWAYS use `governance(hire-manager)` which runs executive consultation first",
+    "- **Spawning a worker**: ALWAYS use `governance(spawn-worker)` which runs executive consultation first",
+    "- **Activating a manager**: ALWAYS use `governance(activate-manager, projectName: 'xxx')` when a manager has pending tasks - this spawns workers automatically",
+    "- **Any significant decision**: Use `governance(fast-consult)` - checks patterns first, auto-approves at 80% confidence",
+    "- Multi-step tasks: delegate to workers, don't do it yourself",
+    "- Use `governance(check-pattern)` to see if a task matches an approved pattern",
+    "- Use `governance(learn-pattern)` to teach the system from task outcomes",
+    "- For immediate worker execution: use `governance(exec-worker)` with worker type + task",
+    "- Use `governance(system-status)` to check overall system health",
+    "- Use `governance(submit-priority)` and `governance(get-priorities)` for dynamic priority ranking",
+    "- Use `governance(send-event)` and `governance(poll-events)` for worker coordination",
+    "- Check `governance(list-managers)` and `governance(list-workers)` for status",
+    "- Workers automatically use the Skynet failover system for model selection",
+    "",
+    "**Every task outcome teaches the system!**",
+    "After completing ANY task, ALWAYS use `governance(learn-pattern)` to record the outcome for future auto-approval.",
+    "",
+    "**CRITICAL: Never do sustained work yourself - you MUST delegate to workers or hire managers!**",
+    "If a task requires more than a couple of minutes, spawn a worker or hire a manager.",
+    "",
+    "**Manager Execution Loop (Autonomous)**",
+    "Managers with autoSpawn: true in their config will automatically:",
+    "- Check for pending tasks every tickIntervalMs (default 60s)",
+    "- Spawn workers up to maxConcurrentWorkers limit",
+    "- Track worker completion and spawn more work",
+    "- Retry failed tasks up to maxRetries times",
+    "",
+    "You can configure managers via their manager.json:",
+    "- autoSpawn: true/false - enable/disable autonomous execution",
+    "- tickIntervalMs: 60000 - how often manager checks for work",
+    "- maxConcurrentWorkers: 3 - parallel work limit",
+    "- workerTimeoutMs: 600000 - soft timeout before retry (10 min)",
+    "- maxRetries: 2 - failed task retry limit",
+    "",
+    "If a manager has work but autoSpawn is false, use governance(activate-manager, projectName: 'xxx') to trigger execution.",
+    "If tasks exist but aren't being tracked, use governance(sync-manager, projectName: 'xxx') to re-sync manager state.",
+    "",
     "## Skynet CLI Quick Reference",
     "Skynet is controlled via subcommands. Do not invent commands.",
     "To manage the Gateway daemon service (start/stop/restart):",
@@ -516,7 +532,6 @@ export function buildAgentSystemPrompt(params: {
     workspaceGuidance,
     ...workspaceNotes,
     "",
-    ...swarmViolationsSection,
     ...docsSection,
     params.sandboxInfo?.enabled ? "## Sandbox" : "",
     params.sandboxInfo?.enabled

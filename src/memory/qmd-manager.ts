@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
-import type { OpenClawConfig } from "../config/config.js";
+import type { SkynetConfig } from "../config/config.js";
 import { resolveStateDir } from "../config/paths.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { isFileMissingError, statRegularFile } from "./fs-utils.js";
@@ -140,7 +140,7 @@ type QmdManagerMode = "full" | "status";
 
 export class QmdMemoryManager implements MemorySearchManager {
   static async create(params: {
-    cfg: OpenClawConfig;
+    cfg: SkynetConfig;
     agentId: string;
     resolved: ResolvedMemoryBackendConfig;
     mode?: QmdManagerMode;
@@ -154,7 +154,7 @@ export class QmdMemoryManager implements MemorySearchManager {
     return manager;
   }
 
-  private readonly cfg: OpenClawConfig;
+  private readonly cfg: SkynetConfig;
   private readonly agentId: string;
   private readonly qmd: ResolvedQmdConfig;
   private readonly workspaceDir: string;
@@ -193,11 +193,7 @@ export class QmdMemoryManager implements MemorySearchManager {
   private embedFailureCount = 0;
   private attemptedNullByteCollectionRepair = false;
 
-  private constructor(params: {
-    cfg: OpenClawConfig;
-    agentId: string;
-    resolved: ResolvedQmdConfig;
-  }) {
+  private constructor(params: { cfg: SkynetConfig; agentId: string; resolved: ResolvedQmdConfig }) {
     this.cfg = params.cfg;
     this.agentId = params.agentId;
     this.qmd = params.resolved;

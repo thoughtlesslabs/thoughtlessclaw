@@ -299,6 +299,20 @@ export async function ensureWorkspaceAndSessions(
   const sessionsDir = resolveSessionTranscriptsDirForAgent(options?.agentId);
   await fs.mkdir(sessionsDir, { recursive: true });
   runtime.log(`Sessions OK: ${shortenHomePath(sessionsDir)}`);
+
+  // Initialize the Vault structure alongside the workspace.
+  // This ensures executives, system project, and inbox are provisioned
+  // so there is no need for a separate `skynet init` step.
+  try {
+    const { createSkynet } = await import("../skynet/index.js");
+    const skynetSys = createSkynet({ vaultPath: "~/.skynet/vault" });
+    await skynetSys.initialize();
+    runtime.log("Vault OK: ~/.skynet/vault");
+  } catch {
+    // Vault init is best-effort during onboarding — the workspace itself
+    // is the critical path. If vault init fails (e.g. missing deps),
+    // the user can run `skynet init` later.
+  }
 }
 
 export function resolveNodeManagerOptions(): Array<{

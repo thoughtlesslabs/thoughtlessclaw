@@ -376,7 +376,7 @@ struct SettingsTab: View {
                             .truncationMode(.middle)
                         LabeledContent("Device", value: DeviceInfoHelper.deviceFamily())
                         LabeledContent("Platform", value: DeviceInfoHelper.platformStringForDisplay())
-                        LabeledContent("Skynet", value: DeviceInfoHelper.skynetVersionString())
+                        LabeledContent("Skynet", value: DeviceInfoHelper.openClawVersionString())
                     }
                 }
             }

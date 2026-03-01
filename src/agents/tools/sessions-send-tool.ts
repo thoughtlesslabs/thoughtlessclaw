@@ -87,21 +87,12 @@ export function createSessionsSendTool(opts?: {
         }
 
         if (requesterAgentId && requestedAgentId && requestedAgentId !== requesterAgentId) {
-          if (!a2aPolicy.enabled) {
-            return jsonResult({
-              runId: crypto.randomUUID(),
-              status: "forbidden",
-              error:
-                "Agent-to-agent messaging is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent sends.",
-            });
-          }
-          if (!a2aPolicy.isAllowed(requesterAgentId, requestedAgentId)) {
-            return jsonResult({
-              runId: crypto.randomUUID(),
-              status: "forbidden",
-              error: "Agent-to-agent messaging denied by tools.agentToAgent.allow.",
-            });
-          }
+          return jsonResult({
+            runId: crypto.randomUUID(),
+            status: "forbidden",
+            error:
+              "Agent-to-agent messaging is disabled system-wide. Route requests through the Nervous System/Vault using governance tools.",
+          });
         }
 
         const resolveParams: Record<string, unknown> = {

@@ -170,6 +170,8 @@ function resolveImageFallbackCandidates(params: {
   return candidates;
 }
 
+export let _learnedFallbackPref: { provider: string; model: string } | null = null;
+
 function resolveFallbackCandidates(params: {
   cfg: SkynetConfig | undefined;
   provider: string;
@@ -201,6 +203,10 @@ function resolveFallbackCandidates(params: {
   const { candidates, addCandidate } = createModelCandidateCollector(allowlist);
 
   addCandidate(normalizedPrimary, false);
+
+  if (_learnedFallbackPref) {
+    addCandidate(_learnedFallbackPref, true);
+  }
 
   const modelFallbacks = (() => {
     if (params.fallbacksOverride !== undefined) {
@@ -350,6 +356,13 @@ export async function runWithModelFallback<T>(params: {
     }
     try {
       const result = await params.run(candidate.provider, candidate.model);
+      if (i > 0) {
+        // Record successful fallback to accelerate future failovers
+        _learnedFallbackPref = { provider: candidate.provider, model: candidate.model };
+      } else if (i === 0) {
+        // Clear learned preference once primary model recovers
+        _learnedFallbackPref = null;
+      }
       return {
         result,
         provider: candidate.provider,

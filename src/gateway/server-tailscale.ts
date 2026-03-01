@@ -38,10 +38,6 @@ export async function startGatewayTailscaleExposure(params: {
     );
   }
 
-  if (!params.resetOnExit) {
-    return null;
-  }
-
   return async () => {
     try {
       if (params.tailscaleMode === "serve") {

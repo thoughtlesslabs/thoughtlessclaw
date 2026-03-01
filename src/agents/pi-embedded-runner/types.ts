@@ -62,6 +62,7 @@ export type EmbeddedPiRunResult = {
     replyToId?: string;
     isError?: boolean;
   }>;
+  toolMetas?: Array<{ toolName: string; meta?: string }>;
   meta: EmbeddedPiRunMeta;
   // True if a messaging tool (telegram, whatsapp, discord, slack, sessions_send)
   // successfully sent a message. Used to suppress agent's confirmation text.

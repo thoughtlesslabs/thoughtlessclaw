@@ -87,40 +87,13 @@ export function resolveSandboxedSessionToolContext(params: {
   };
 }
 
-export function createAgentToAgentPolicy(cfg: SkynetConfig): AgentToAgentPolicy {
-  const routingA2A = cfg.tools?.agentToAgent;
-  const enabled = routingA2A?.enabled === true;
-  const allowPatterns = Array.isArray(routingA2A?.allow) ? routingA2A.allow : [];
-  const matchesAllow = (agentId: string) => {
-    if (allowPatterns.length === 0) {
-      return true;
-    }
-    return allowPatterns.some((pattern) => {
-      const raw = String(pattern ?? "").trim();
-      if (!raw) {
-        return false;
-      }
-      if (raw === "*") {
-        return true;
-      }
-      if (!raw.includes("*")) {
-        return raw === agentId;
-      }
-      const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(`^${escaped.replaceAll("\\*", ".*")}$`, "i");
-      return re.test(agentId);
-    });
+export function createAgentToAgentPolicy(_cfg: SkynetConfig): AgentToAgentPolicy {
+  return {
+    enabled: false,
+    matchesAllow: () => false,
+    isAllowed: (requesterAgentId: string, targetAgentId: string) =>
+      requesterAgentId === targetAgentId,
   };
-  const isAllowed = (requesterAgentId: string, targetAgentId: string) => {
-    if (requesterAgentId === targetAgentId) {
-      return true;
-    }
-    if (!enabled) {
-      return false;
-    }
-    return matchesAllow(requesterAgentId) && matchesAllow(targetAgentId);
-  };
-  return { enabled, matchesAllow, isAllowed };
 }
 
 function actionPrefix(action: SessionAccessAction): string {
@@ -134,23 +107,11 @@ function actionPrefix(action: SessionAccessAction): string {
 }
 
 function a2aDisabledMessage(action: SessionAccessAction): string {
-  if (action === "history") {
-    return "Agent-to-agent history is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent access.";
-  }
-  if (action === "send") {
-    return "Agent-to-agent messaging is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent sends.";
-  }
-  return "Agent-to-agent listing is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent visibility.";
+  return `Agent-to-agent ${action} is disabled system-wide. Route requests through the Nervous System/Vault using governance tools.`;
 }
 
 function a2aDeniedMessage(action: SessionAccessAction): string {
-  if (action === "history") {
-    return "Agent-to-agent history denied by tools.agentToAgent.allow.";
-  }
-  if (action === "send") {
-    return "Agent-to-agent messaging denied by tools.agentToAgent.allow.";
-  }
-  return "Agent-to-agent listing denied by tools.agentToAgent.allow.";
+  return a2aDisabledMessage(action);
 }
 
 function crossVisibilityMessage(action: SessionAccessAction): string {

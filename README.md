@@ -18,10 +18,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
 </p>
 
-**Skynet** is an autonomous AI ecosystem born from the absorption and evolution of the OpenClaw framework. 
-It combines OpenClaw's extensible, multi-channel gateway (WhatsApp, Telegram, Slack, Discord, iOS, etc.) with Skynet's new immortal "Vault-First" memory, self-governing Triad Council, and dynamic Worker generation. The Gateway acts as the control plane for human intervention, but Skynet's true power lies in its continuous, unmonitored autonomous loops.
+**Skynet** is a _personal AI assistant_ you run on your own devices.
+It answers you on the channels you already use (WhatsApp, Telegram, Slack, Discord, Google Chat, Signal, iMessage, Microsoft Teams, WebChat), plus extension channels like BlueBubbles, Matrix, Zalo, and Zalo Personal. It can speak and listen on macOS/iOS/Android, and can render a live Canvas you control. The Gateway is just the control plane — the product is the assistant.
 
-If you want a personal, limitless assistant that feels local, fast, and always-on, this is the final evolution.
+If you want a personal, single-user assistant that feels local, fast, and always-on, this is it.
 
 [Website](https://skynet.ai) · [Docs](https://docs.skynet.ai) · [Vision](VISION.md) · [DeepWiki](https://deepwiki.com/skynet/skynet) · [Getting Started](https://docs.skynet.ai/start/getting-started) · [Updating](https://docs.skynet.ai/install/updating) · [Showcase](https://docs.skynet.ai/start/showcase) · [FAQ](https://docs.skynet.ai/help/faq) · [Wizard](https://docs.skynet.ai/start/wizard) · [Nix](https://github.com/skynet/nix-skynet) · [Docker](https://docs.skynet.ai/install/docker) · [Discord](https://discord.gg/clawd)
 

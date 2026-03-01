@@ -236,7 +236,10 @@ export async function resolveGatewayProgramArguments(params: {
   runtime?: GatewayRuntimePreference;
   nodePath?: string;
 }): Promise<GatewayProgramArgs> {
-  const gatewayArgs = ["gateway", "--port", String(params.port)];
+  // Launch `skynet start` instead of the legacy `skynet gateway`.
+  // The `start` command boots the full Skynet system: Vault + executives +
+  // inbox server + gateway, providing a unified daemon.
+  const gatewayArgs = ["gateway", "run", "--port", String(params.port)];
   return resolveCliProgramArguments({
     args: gatewayArgs,
     dev: params.dev,

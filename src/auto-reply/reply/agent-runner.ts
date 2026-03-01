@@ -520,6 +520,183 @@ export async function runReplyAgent(params: {
     const { replyPayloads } = payloadResult;
     didLogHeartbeatStrip = payloadResult.didLogHeartbeatStrip;
 
+    // ----- NERVOUS SYSTEM INTERCEPTOR -----
+    if (sessionKey && !isHeartbeat) {
+      const toolMetas = runResult.toolMetas ?? [];
+      let calledGovernance = toolMetas.some((m) => m.toolName === "governance");
+      const calledPing = toolMetas.some((m) => m.toolName === "ping");
+
+      // Auto-Governance Physical Hooks
+      const combinedText = replyPayloads
+        .map((p) => p.text || "")
+        .join("\n")
+        .trim();
+
+      if (!calledGovernance) {
+        // 1. Auto-Complete Hook (DONE:)
+        const doneMatch = combinedText.match(/^DONE:\s*(.+)/im);
+        if (doneMatch) {
+          defaultRuntime.log?.(
+            `Nervous System: physical hook [DONE:] detected for ${sessionKey}. Auto-completing task.`,
+          );
+          const summary = doneMatch[1].trim();
+
+          try {
+            const vaultMod = await import("../../skynet/vault/manager.js");
+            const vault = vaultMod.createVaultManager("~/.skynet/vault");
+            // Search ALL project worker directories, not just 'system'
+            const projectDirs = await vault.listDirs("projects/").catch(() => [] as string[]);
+            let found = false;
+            for (const project of projectDirs) {
+              if (found) {
+                break;
+              }
+              const workers = await vault
+                .list(`projects/${project}/workers/`)
+                .catch(() => [] as string[]);
+              for (const wf of workers) {
+                if (!wf.endsWith(".json")) {
+                  continue;
+                }
+                const wState = (await vault.read(wf)) as Record<string, unknown> | null;
+                if (wState && wState.agentId === sessionKey) {
+                  const eventId = `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                  const event = {
+                    id: eventId,
+                    path: `events/${eventId}.json`,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    metadata: {},
+                    type: "event",
+                    eventType: "complete-task",
+                    eventData: JSON.stringify({
+                      taskId: wState.currentTaskId,
+                      summary,
+                      artifacts: [],
+                      workerId: sessionKey,
+                      projectName: project,
+                    }),
+                    recipient: "broadcast",
+                    timestamp: Date.now(),
+                  };
+                  await vault.write(`events/${eventId}.json`, event);
+                  // Wake the project manager immediately
+                  try {
+                    const { requestHeartbeatNow } = await import("../../infra/heartbeat-wake.js");
+                    requestHeartbeatNow({
+                      reason: "action:task-complete",
+                      agentId: `manager-${project}`,
+                    });
+                  } catch {
+                    /* best-effort */
+                  }
+                  calledGovernance = true;
+                  found = true;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            defaultRuntime.error?.(`Auto-complete failed:`, e);
+          }
+        }
+
+        // 2. Auto-Escalate Hook (ERRORS: / BLOCKER:)
+        if (!calledGovernance) {
+          const errorMatch = combinedText.match(/^(?:ERRORS|BLOCKER):\s*(.+)/im);
+          if (errorMatch) {
+            defaultRuntime.log?.(
+              `Nervous System: physical hook [BLOCKER] detected for ${sessionKey}. Auto-escalating.`,
+            );
+            const detail = errorMatch[1].trim();
+
+            try {
+              const vaultMod = await import("../../skynet/vault/manager.js");
+              const vault = vaultMod.createVaultManager("~/.skynet/vault");
+              // Find which project this worker belongs to for correct manager routing
+              let workerProjectName = "system";
+              const projectDirs = await vault.listDirs("projects/").catch(() => [] as string[]);
+              for (const proj of projectDirs) {
+                const workers = await vault
+                  .list(`projects/${proj}/workers/`)
+                  .catch(() => [] as string[]);
+                for (const wf of workers) {
+                  if (!wf.endsWith(".json")) {
+                    continue;
+                  }
+                  const wState = (await vault.read(wf)) as
+                    | (Record<string, unknown> & { metadata?: { projectName?: string } })
+                    | null;
+                  if (wState && wState.agentId === sessionKey) {
+                    workerProjectName = wState.metadata?.projectName || proj;
+                    break;
+                  }
+                }
+              }
+              const escalationId = `escalation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              const escalation = {
+                id: escalationId,
+                path: `events/${escalationId}.json`,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                metadata: { projectName: workerProjectName },
+                type: "event",
+                eventType: "escalation:worker→manager",
+                eventData: JSON.stringify({
+                  question: `[AUTO-ESCALATION] Worker blocked: ${detail}`,
+                  proposedSolution: "Please review and advise.",
+                  taskId: "unknown",
+                  sender: sessionKey,
+                  escalationPath: ["worker", "manager"],
+                }),
+                recipient: `manager-${workerProjectName}`,
+                timestamp: Date.now(),
+                status: "pending",
+              };
+              await vault.write(`events/${escalationId}.json`, escalation);
+              // Wake the specific project manager
+              try {
+                const { requestHeartbeatNow } = await import("../../infra/heartbeat-wake.js");
+                requestHeartbeatNow({
+                  reason: "action:worker-blocker",
+                  agentId: `manager-${workerProjectName}`,
+                });
+              } catch {
+                /* best-effort */
+              }
+              calledGovernance = true;
+            } catch (e) {
+              defaultRuntime.error?.(`Auto-escalate failed:`, e);
+            }
+          }
+        }
+      }
+
+      // Final Penalty Check
+      if (!calledGovernance && !calledPing) {
+        defaultRuntime.error?.(
+          `Nervous System: agent ${sessionKey} failed to call governance or ping, and triggered no physical physical hooks. Penalizing.`,
+        );
+        enqueueSystemEvent(
+          "[NERVOUS_SYSTEM] Action blocked by Governance. No governance tool called. You are penalized for breaking protocol. Please call the governance tool with an appropriate action before ending your turn.",
+          { sessionKey },
+        );
+        const penaltyRun: FollowupRun = {
+          ...followupRun,
+          prompt: "",
+          messageId: generateSecureUuid(),
+        };
+        const penaltyQueue: QueueSettings = {
+          mode: "followup",
+          dropPolicy: "old",
+          cap: 10,
+        };
+        // Enqueue an immediate followup run to force the agent to see the penalty and respond
+        enqueueFollowupRun(queueKey, penaltyRun, penaltyQueue, "none");
+      }
+    }
+    // --------------------------------------
+
     if (replyPayloads.length === 0) {
       return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
     }

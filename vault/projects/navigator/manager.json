@@ -1,0 +1,16 @@
+{
+  "project": "navigator",
+  "status": "active",
+  "initialized": "2026-02-28T03:55:16.983Z",
+  "activeTasks": ["task-1772287268480-tukpp7"],
+  "completedTasks": 0,
+  "totalTasks": 1,
+  "blockers": [],
+  "lastCheckIn": null,
+  "firedToday": {
+    "date": "2026-02-28",
+    "morningHunt": "2026-02-28T09:00:00.000-05:00",
+    "afternoonReview": null
+  },
+  "notes": "Morning intelligence hunt task created and researcher worker spawned at 09:00 EST."
+}

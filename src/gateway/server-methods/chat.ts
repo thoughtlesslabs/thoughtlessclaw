@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@mariozechner/pi-coding-agent";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
@@ -297,6 +298,21 @@ function ensureTranscriptFile(params: { transcriptPath: string; sessionId: strin
   if (fs.existsSync(params.transcriptPath)) {
     return { ok: true };
   }
+
+  // Safety check: ensure transcript path is within user's home directory
+  // This prevents errors like "mkdir '/.skynet'" when home directory isn't properly resolved
+  const resolvedPath = path.resolve(params.transcriptPath);
+  const homeDir = os.homedir();
+  const resolvedHome = path.resolve(homeDir);
+
+  // If the path doesn't start with the resolved home directory, something is wrong
+  if (!resolvedPath.startsWith(resolvedHome + path.sep) && resolvedPath !== resolvedHome) {
+    return {
+      ok: false,
+      error: `Invalid transcript path: ${params.transcriptPath} (resolved to ${resolvedPath}, home is ${resolvedHome}). Check SKYNET_HOME or HOME environment variable.`,
+    };
+  }
+
   try {
     fs.mkdirSync(path.dirname(params.transcriptPath), { recursive: true });
     const header = {

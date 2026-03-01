@@ -86,7 +86,7 @@ export async function findTailscaleBinary(): Promise<string | null> {
 
   // Strategy 4: locate command
   try {
-    const { stdout } = await runExec("locate", ["Tailscale.app"]);
+    const { stdout } = await runExec("locate", ["Tailscale.app"], { timeoutMs: 5000 });
     const candidates = stdout
       .trim()
       .split("\n")

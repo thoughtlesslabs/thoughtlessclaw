@@ -5,7 +5,6 @@ import { hasRootVersionAlias } from "./argv.js";
 import { pickTagline, type TaglineOptions } from "./tagline.js";
 
 type BannerOptions = TaglineOptions & {
-  argv?: string[];
   commit?: string | null;
   columns?: number;
   richTty?: boolean;
@@ -40,8 +39,8 @@ export function formatCliBannerLine(version: string, options: BannerOptions = {}
   const commitLabel = commit ?? "unknown";
   const tagline = pickTagline(options);
   const rich = options.richTty ?? isRich();
-  const title = "🦞 Skynet";
-  const prefix = "🦞 ";
+  const title = "☠️ Skynet";
+  const prefix = "☠️ ";
   const columns = options.columns ?? process.stdout.columns ?? 120;
   const plainFullLine = `${title} ${version} (${commitLabel}) — ${tagline}`;
   const fitsOnOneLine = visibleWidth(plainFullLine) <= columns;
@@ -65,20 +64,20 @@ export function formatCliBannerLine(version: string, options: BannerOptions = {}
   return `${line1}\n${line2}`;
 }
 
-const LOBSTER_ASCII = [
+const SKYNET_ASCII = [
   "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄",
   "██░▄▄▄░██░▄▄░██░▄▄▄██░▀██░██░▄▄▀██░████░▄▄▀██░███░██",
   "██░███░██░▀▀░██░▄▄▄██░█░█░██░█████░████░▀▀░██░█░█░██",
   "██░▀▀▀░██░█████░▀▀▀██░██▄░██░▀▀▄██░▀▀░█░██░██▄▀▄▀▄██",
   "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀",
-  "                  🦞 SKYNET 🦞                    ",
+  "                  ☠️ SKYNET ☠️                    ",
   " ",
 ];
 
 export function formatCliBannerArt(options: BannerOptions = {}): string {
   const rich = options.richTty ?? isRich();
   if (!rich) {
-    return LOBSTER_ASCII.join("\n");
+    return SKYNET_ASCII.join("\n");
   }
 
   const colorChar = (ch: string) => {
@@ -94,13 +93,13 @@ export function formatCliBannerArt(options: BannerOptions = {}): string {
     return theme.muted(ch);
   };
 
-  const colored = LOBSTER_ASCII.map((line) => {
+  const colored = SKYNET_ASCII.map((line) => {
     if (line.includes("SKYNET")) {
       return (
         theme.muted("              ") +
-        theme.accent("🦞") +
+        theme.accent("☠️") +
         theme.info(" SKYNET ") +
-        theme.accent("🦞")
+        theme.accent("☠️")
       );
     }
     return splitGraphemes(line).map(colorChar).join("");

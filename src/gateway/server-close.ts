@@ -122,9 +122,13 @@ export function createGatewayCloseHandler(params: {
     for (const server of servers) {
       const httpServer = server as HttpServer & {
         closeIdleConnections?: () => void;
+        closeAllConnections?: () => void;
       };
       if (typeof httpServer.closeIdleConnections === "function") {
         httpServer.closeIdleConnections();
+      }
+      if (typeof httpServer.closeAllConnections === "function") {
+        httpServer.closeAllConnections();
       }
       await new Promise<void>((resolve, reject) =>
         httpServer.close((err) => (err ? reject(err) : resolve())),

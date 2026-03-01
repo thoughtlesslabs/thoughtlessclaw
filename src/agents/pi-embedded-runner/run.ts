@@ -1129,6 +1129,7 @@ export async function runEmbeddedPiAgent(
           }
           return {
             payloads: payloads.length ? payloads : undefined,
+            toolMetas: attempt.toolMetas,
             meta: {
               durationMs: Date.now() - started,
               agentMeta,

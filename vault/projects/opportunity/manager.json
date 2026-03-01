@@ -1,0 +1,25 @@
+{
+  "project": "opportunity",
+  "status": "active",
+  "initialized": "2026-02-28T04:00:20.000Z",
+  "activeTasks": [],
+  "completedTasks": 0,
+  "totalTasks": 0,
+  "blockers": [
+    {
+      "id": "blocker-001",
+      "type": "missing-profile",
+      "description": "No user job search profile found. Cannot run daily hunts or weekly reviews without search criteria (target roles, skills, location, remote preference, salary range).",
+      "created": "2026-02-28T04:00:20.000Z",
+      "escalated": false
+    }
+  ],
+  "lastCheckIn": "2026-02-28T04:00:20.000Z",
+  "lastHunt": null,
+  "lastWeeklyReview": null,
+  "scheduleMissed": {
+    "weeklyReview": "2026-02-27T22:00:00.000Z",
+    "reason": "First boot — no profile available"
+  },
+  "notes": "Project bootstrapped on first startup. Awaiting user profile and search criteria."
+}

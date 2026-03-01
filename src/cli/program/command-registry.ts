@@ -82,6 +82,29 @@ const coreEntries: CoreCliEntry[] = [
   {
     commands: [
       {
+        name: "skynet",
+        description: "Skynet Autonomous OS - Self-sustaining agent workforce",
+        hasSubcommands: true,
+      },
+    ],
+    register: async ({ program, argv }) => {
+      const { registerSkynetCli } = await import("../skynet-cli.js");
+      const { resolveCliName } = await import("../cli-name.js");
+      const cliName = resolveCliName(argv);
+      const asRoot = cliName === "skynet";
+
+      if (asRoot) {
+        const skynet = program.command("skynet");
+        const { registerSkynetCommands } = await import("../skynet-cli.js");
+        registerSkynetCommands(skynet);
+      } else {
+        void registerSkynetCli(program, asRoot);
+      }
+    },
+  },
+  {
+    commands: [
+      {
         name: "config",
         description:
           "Non-interactive config helpers (get/set/unset). Default: starts setup wizard.",
@@ -145,19 +168,6 @@ const coreEntries: CoreCliEntry[] = [
     register: async ({ program }) => {
       const mod = await import("../memory-cli.js");
       mod.registerMemoryCli(program);
-    },
-  },
-  {
-    commands: [
-      {
-        name: "skynet",
-        description: "Skynet autonomous architecture commands",
-        hasSubcommands: true,
-      },
-    ],
-    register: async ({ program }) => {
-      const mod = await import("./register.skynet.js");
-      mod.registerSkynetCommands(program);
     },
   },
   {
@@ -261,7 +271,7 @@ function registerLazyCoreCommand(
   const placeholder = program.command(command.name).description(command.description);
   placeholder.allowUnknownOption(true);
   placeholder.allowExcessArguments(true);
-  placeholder.action(async (...actionArgs: any[]) => {
+  placeholder.action(async (...actionArgs: unknown[]) => {
     removeEntryCommands(program, entry);
     await entry.register({ program, ctx, argv: process.argv });
     await reparseProgramFromActionArgs(program, actionArgs);

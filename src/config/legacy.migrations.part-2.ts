@@ -318,13 +318,7 @@ export const LEGACY_CONFIG_MIGRATIONS_PART_2: LegacyConfigMigration[] = [
       }
 
       if (routing.agentToAgent !== undefined) {
-        const tools = ensureRecord(raw, "tools");
-        if (tools.agentToAgent === undefined) {
-          tools.agentToAgent = routing.agentToAgent;
-          changes.push("Moved routing.agentToAgent → tools.agentToAgent.");
-        } else {
-          changes.push("Removed routing.agentToAgent (tools.agentToAgent already set).");
-        }
+        changes.push("Removed legacy routing.agentToAgent (feature deprecated).");
         delete routing.agentToAgent;
       }
 

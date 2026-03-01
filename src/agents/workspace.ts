@@ -14,9 +14,12 @@ export function resolveDefaultAgentWorkspaceDir(
   const home = resolveRequiredHomeDir(env, homedir);
   const profile = env.SKYNET_PROFILE?.trim();
   if (profile && profile.toLowerCase() !== "default") {
-    return path.join(home, ".skynet", `workspace-${profile}`);
+    return path.join(home, ".skynet", "vault", "agents", `main-${profile}`);
   }
-  return path.join(home, ".skynet", "workspace");
+  // Point the default workspace directly into the Vault's main executive directory.
+  // This is the single integration point that bridges the legacy Gateway system
+  // (Telegram, Discord, etc.) with the new Vault architecture.
+  return path.join(home, ".skynet", "vault", "agents", "main");
 }
 
 export const DEFAULT_AGENT_WORKSPACE_DIR = resolveDefaultAgentWorkspaceDir();

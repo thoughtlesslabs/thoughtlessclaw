@@ -89,17 +89,6 @@ const resolveGitHead = (deps) => {
   return head || null;
 };
 
-const hasDirtySourceTree = (deps) => {
-  const output = runGit(
-    ["status", "--porcelain", "--untracked-files=normal", "--", ...runNodeWatchedPaths],
-    deps,
-  );
-  if (output === null) {
-    return null;
-  }
-  return output.length > 0;
-};
-
 const readBuildStamp = (deps) => {
   const mtime = statMtime(deps.buildStampPath, deps.fs);
   if (mtime == null) {
@@ -128,10 +117,6 @@ const hasSourceMtimeChanged = (stampMtime, deps) => {
 };
 
 const shouldBuild = (deps) => {
-  // [Skynet Override]: Bypass the pnpm build requirement during local testing to avoid sandbox EPERM errors.
-  if (deps.env.SKYNET_SKIP_BUILD === "1") {
-    return false;
-  }
   if (deps.env.SKYNET_FORCE_BUILD === "1") {
     return true;
   }
@@ -156,15 +141,6 @@ const shouldBuild = (deps) => {
   }
   if (currentHead && stamp.head && currentHead !== stamp.head) {
     return hasSourceMtimeChanged(stamp.mtime, deps);
-  }
-  if (currentHead) {
-    const dirty = hasDirtySourceTree(deps);
-    if (dirty === true) {
-      return true;
-    }
-    if (dirty === false) {
-      return false;
-    }
   }
 
   if (hasSourceMtimeChanged(stamp.mtime, deps)) {

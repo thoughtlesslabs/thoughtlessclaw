@@ -537,17 +537,11 @@ export type ToolsConfig = {
       enabled?: boolean;
     };
   };
-  agentToAgent?: {
-    /** Enable agent-to-agent messaging tools. Default: false. */
-    enabled?: boolean;
-    /** Allowlist of agent ids or patterns (implementation-defined). */
-    allow?: string[];
-  };
   /**
    * Session tool visibility controls which sessions can be targeted by session tools
    * (sessions_list, sessions_history, sessions_send).
    *
-   * Default: "tree" (current session + spawned subagent sessions).
+   * Default: "tree"(current session + spawned subagent sessions).
    */
   sessions?: {
     /**

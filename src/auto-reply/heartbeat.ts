@@ -1,10 +1,16 @@
 import { escapeRegExp } from "../utils.js";
 import { HEARTBEAT_TOKEN } from "./tokens.js";
 
-// Default heartbeat prompt (used when config.agents.defaults.heartbeat.prompt is unset).
-// Keep it tight and avoid encouraging the model to invent/rehash "open loops" from prior chat context.
+// Default heartbeat prompt — this acts as a Nervous System dormant-check watchdog.
+// Agents check the Vault for pending Nervous System events (escalations, decisions, tasks).
+// HEARTBEAT_OK means truly idle with no pending work. Output DONE:/ERRORS:/BLOCKER: on a
+// new line to trigger the Gateway Interceptor instead of manually calling governance tools.
 export const HEARTBEAT_PROMPT =
-  "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply HEARTBEAT_OK.";
+  "DORMANT-CHECK: You have received an automated watchdog ping from the Nervous System. " +
+  "1. Run governance(poll-events) to check for pending escalations, decisions, or Nervous System events addressed to you. " +
+  "2. If escalation events exist: respond using governance(create-decision) with your decision, then governance(propagate-decision) to route it back. " +
+  "3. If tasks exist in your Vault project: continue working and output DONE:, ERRORS:, or BLOCKER: when appropriate. " +
+  "4. If nothing is pending: reply HEARTBEAT_OK.";
 export const DEFAULT_HEARTBEAT_EVERY = "30m";
 export const DEFAULT_HEARTBEAT_ACK_MAX_CHARS = 300;
 

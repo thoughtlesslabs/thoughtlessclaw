@@ -1,0 +1,27 @@
+{
+  "project": "system",
+  "status": "active",
+  "activatedAt": "2026-02-28T03:59:17.283Z",
+  "completedTasks": 1,
+  "totalTasks": 3,
+  "activeWorkers": [
+    {
+      "workerId": "skynet-thinker",
+      "workerType": "thinker",
+      "taskId": "task-1772251281161-yxom8l",
+      "task": "Weekly System Review \u2014 Week of 2026-02-27",
+      "spawnedAt": "2026-02-28T03:59:17.283Z"
+    }
+  ],
+  "blockers": [
+    {
+      "type": "rate-limit",
+      "description": "9AM daily hunt FAILED 4 times (09:00, 09:02, 09:30, 10:00). Missed by 1 hour. Rate limits sustained since 06:00. Aborting retry attempts for today.",
+      "since": "2026-02-28T15:00:00Z",
+      "retryAt": "none",
+      "status": "failed-missed"
+    }
+  ],
+  "lastCheckIn": "2026-02-28T14:00:00Z",
+  "notes": "9AM hunt missed x4. Rate limits blocking entire session. 62 pending tasks remain unaddressed."
+}

@@ -14,7 +14,6 @@ import { runCommandWithRuntime } from "../cli-utils.js";
 import { hasExplicitOptions } from "../command-options.js";
 import { createDefaultDeps } from "../deps.js";
 import { formatHelpExamples } from "../help-format.js";
-import { collectOption } from "./helpers.js";
 
 export function registerAgentCommands(program: Command, args: { agentChannelOptions: string }) {
   program
@@ -81,7 +80,7 @@ ${theme.muted("Docs:")} ${formatDocsLink("/cli/agent", "docs.skynet.ai/cli/agent
 
   const agents = program
     .command("agents")
-    .description("Manage isolated agents (workspaces + auth + routing)")
+    .description("Manage Skynet agents and project managers (Vault-backed)")
     .addHelpText(
       "after",
       () =>
@@ -90,13 +89,13 @@ ${theme.muted("Docs:")} ${formatDocsLink("/cli/agent", "docs.skynet.ai/cli/agent
 
   agents
     .command("list")
-    .description("List configured agents")
+    .description("List executives and project managers from the Vault")
     .option("--json", "Output JSON instead of text", false)
-    .option("--bindings", "Include routing bindings", false)
+    .option("--vault <path>", "Vault path", "~/.skynet/vault")
     .action(async (opts) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
         await agentsListCommand(
-          { json: Boolean(opts.json), bindings: Boolean(opts.bindings) },
+          { json: Boolean(opts.json), vault: opts.vault as string },
           defaultRuntime,
         );
       });
@@ -104,29 +103,19 @@ ${theme.muted("Docs:")} ${formatDocsLink("/cli/agent", "docs.skynet.ai/cli/agent
 
   agents
     .command("add [name]")
-    .description("Add a new isolated agent")
-    .option("--workspace <dir>", "Workspace directory for the new agent")
-    .option("--model <id>", "Model id for this agent")
-    .option("--agent-dir <dir>", "Agent state directory for this agent")
-    .option("--bind <channel[:accountId]>", "Route channel binding (repeatable)", collectOption, [])
-    .option("--non-interactive", "Disable prompts; requires --workspace", false)
+    .description("Hire a new project manager in the Vault")
+    .option("-d, --description <text>", "Project description")
+    .option("--vault <path>", "Vault path", "~/.skynet/vault")
+    .option("--non-interactive", "Disable prompts", false)
     .option("--json", "Output JSON summary", false)
     .action(async (name, opts, command) => {
       await runCommandWithRuntime(defaultRuntime, async () => {
-        const hasFlags = hasExplicitOptions(command, [
-          "workspace",
-          "model",
-          "agentDir",
-          "bind",
-          "nonInteractive",
-        ]);
+        const hasFlags = hasExplicitOptions(command, ["description", "vault", "nonInteractive"]);
         await agentsAddCommand(
           {
             name: typeof name === "string" ? name : undefined,
-            workspace: opts.workspace as string | undefined,
-            model: opts.model as string | undefined,
-            agentDir: opts.agentDir as string | undefined,
-            bind: Array.isArray(opts.bind) ? (opts.bind as string[]) : undefined,
+            description: opts.description as string | undefined,
+            vault: opts.vault as string | undefined,
             nonInteractive: Boolean(opts.nonInteractive),
             json: Boolean(opts.json),
           },
@@ -188,7 +177,8 @@ ${formatHelpExamples([
 
   agents
     .command("delete <id>")
-    .description("Delete an agent and prune workspace/state")
+    .description("Delete a project and its manager from the Vault")
+    .option("--vault <path>", "Vault path", "~/.skynet/vault")
     .option("--force", "Skip confirmation", false)
     .option("--json", "Output JSON summary", false)
     .action(async (id, opts) => {
@@ -196,6 +186,7 @@ ${formatHelpExamples([
         await agentsDeleteCommand(
           {
             id: String(id),
+            vault: opts.vault as string | undefined,
             force: Boolean(opts.force),
             json: Boolean(opts.json),
           },

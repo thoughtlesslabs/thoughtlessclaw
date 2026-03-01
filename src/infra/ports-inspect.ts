@@ -85,6 +85,71 @@ async function resolveUnixParentPid(pid: number): Promise<number | undefined> {
   return Number.isFinite(parentPid) && parentPid > 0 ? parentPid : undefined;
 }
 
+async function canExecuteCommand(command: string): Promise<boolean> {
+  const res = await runCommandSafe(["which", command], 2_000);
+  return res.code === 0;
+}
+
+function parseSsOutput(output: string, port: number): PortListener[] {
+  const listeners: PortListener[] = [];
+  const portToken = `:${port}`;
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || !line.includes(portToken)) {
+      continue;
+    }
+    const pidMatch = line.match(/pid=(\d+)/);
+    const pid = pidMatch ? Number.parseInt(pidMatch[1], 10) : undefined;
+    const commandMatch = line.match(/\("([^"]+)"/);
+    const command = commandMatch ? commandMatch[1] : undefined;
+    if (Number.isFinite(pid)) {
+      listeners.push({ pid, command });
+    }
+  }
+  return listeners;
+}
+
+async function readUnixListenersWithSs(
+  port: number,
+): Promise<{ listeners: PortListener[]; detail?: string; errors: string[] }> {
+  const errors: string[] = [];
+  const hasSs = await canExecuteCommand("ss");
+  if (!hasSs) {
+    return { listeners: [], errors: ["ss command not available"] };
+  }
+  const res = await runCommandSafe(["ss", "-tlnp", `sport = :${port}`]);
+  if (res.code !== 0) {
+    const detail = [res.stderr.trim(), res.stdout.trim()].filter(Boolean).join("\n");
+    if (detail) {
+      errors.push(detail);
+    }
+    return { listeners: [], errors };
+  }
+  const listeners = parseSsOutput(res.stdout, port);
+  await Promise.all(
+    listeners.map(async (listener) => {
+      if (!listener.pid) {
+        return;
+      }
+      const [commandLine, user, parentPid] = await Promise.all([
+        resolveUnixCommandLine(listener.pid),
+        resolveUnixUser(listener.pid),
+        resolveUnixParentPid(listener.pid),
+      ]);
+      if (commandLine) {
+        listener.commandLine = commandLine;
+      }
+      if (user) {
+        listener.user = user;
+      }
+      if (parentPid !== undefined) {
+        listener.ppid = parentPid;
+      }
+    }),
+  );
+  return { listeners, detail: res.stdout.trim() || undefined, errors };
+}
+
 async function readUnixListeners(
   port: number,
 ): Promise<{ listeners: PortListener[]; detail?: string; errors: string[] }> {
@@ -127,7 +192,7 @@ async function readUnixListeners(
   if (detail) {
     errors.push(detail);
   }
-  return { listeners: [], detail: undefined, errors };
+  return await readUnixListenersWithSs(port);
 }
 
 function parseNetstatListeners(output: string, port: number): PortListener[] {

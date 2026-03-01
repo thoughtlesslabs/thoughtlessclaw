@@ -6,7 +6,19 @@ const env = {
 
 export default defineConfig([
   {
-    entry: "src/index.ts",
+    entry: "src/cli/daemon-cli.ts",
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
+    entry: "src/cli/skynet-cli.ts",
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
+    entry: "src/cli/config-cli.ts",
     env,
     fixedExtension: false,
     platform: "node",
@@ -16,6 +28,7 @@ export default defineConfig([
     env,
     fixedExtension: false,
     platform: "node",
+    inlineDependencies: true,
   },
   {
     // Ensure this module is bundled as an entry so legacy CLI shims can resolve its exports.
@@ -55,5 +68,20 @@ export default defineConfig([
     env,
     fixedExtension: false,
     platform: "node",
+  },
+  {
+    entry: "src/skynet/skynet.ts",
+    outDir: "dist/skynet",
+    env,
+    fixedExtension: false,
+    platform: "node",
+  },
+  {
+    entry: "scripts/skynet-daemon.ts",
+    outDir: "dist/scripts",
+    env,
+    fixedExtension: false,
+    platform: "node",
+    inlineDependencies: true,
   },
 ]);

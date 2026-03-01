@@ -70,7 +70,7 @@ export async function inspectGatewayRestart(params: {
   const healthy = running && ownsPort;
   const staleGatewayPids = Array.from(
     new Set(
-      gatewayListeners
+      portUsage.listeners
         .filter((listener) => Number.isFinite(listener.pid))
         .filter((listener) => {
           if (!running) {

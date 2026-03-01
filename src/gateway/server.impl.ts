@@ -242,6 +242,15 @@ export async function startGatewayServer(
     persist: true,
   });
   cfgAtStart = authBootstrap.cfg;
+
+  // Ensure child processes and internal tooling (like sessions_spawn) see the active auth.
+  // This replaces the legacy behavior of `skynet.mjs` wrapper injecting it before boot.
+  if (authBootstrap.auth.mode === "token" && authBootstrap.auth.token) {
+    process.env.SKYNET_GATEWAY_TOKEN = authBootstrap.auth.token;
+  } else if (authBootstrap.auth.mode === "password" && authBootstrap.auth.password) {
+    process.env.SKYNET_GATEWAY_PASSWORD = authBootstrap.auth.password;
+  }
+
   if (authBootstrap.generatedToken) {
     if (authBootstrap.persistedGeneratedToken) {
       log.info(
@@ -262,6 +271,31 @@ export async function startGatewayServer(
     () => getTotalQueueSize() + getTotalPendingReplies() + getActiveEmbeddedRunCount(),
   );
   initSubagentRegistry();
+
+  // Initialize Skynet governance system: executives, system manager, and vault workers.
+  // This brings the full tier hierarchy online: Main (user-facing) → Executive triad
+  // (oversight, monitor, optimizer) → System Manager → Specialized workers.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let skynetSystem: any = null;
+  if (!minimalTestGateway) {
+    try {
+      const { createSkynet } = await import("../skynet/index.js");
+      skynetSystem = createSkynet({ vaultPath: "~/.skynet/vault" });
+      await skynetSystem.initialize();
+      log.info("[Skynet] Governance system initialized: executives + system manager ready");
+
+      // Manager sessions are started by the tick handler - no need for separate startup logic
+
+      const { getTickHandler } = await import("../skynet/proactive/tick-handler.js");
+      const tickHandler = getTickHandler();
+      await tickHandler.initialize();
+      tickHandler.start(60000);
+      log.info("[Skynet] Proactive tick handlers started");
+    } catch (err) {
+      log.warn(`Skynet governance system failed to initialize: ${String(err)}`);
+    }
+  }
+
   const defaultAgentId = resolveDefaultAgentId(cfgAtStart);
   const defaultWorkspaceDir = resolveAgentWorkspaceDir(cfgAtStart, defaultAgentId);
   const baseMethods = listGatewayMethods();

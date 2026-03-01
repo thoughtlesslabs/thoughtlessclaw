@@ -185,6 +185,24 @@ export async function runGatewayLoop(params: {
     while (true) {
       onIteration();
       server = await params.start();
+
+      // === POST-RESTART BOOT SEQUENCE ===
+      // After an in-process restart, immediately re-wake all agents.
+      // requestHeartbeatNow queues a wake the heartbeat runner resolves against
+      // each agent's configured session (creating it from agent config if needed).
+      setTimeout(async () => {
+        try {
+          const { requestHeartbeatNow } = await import("../../infra/heartbeat-wake.js");
+          requestHeartbeatNow({ reason: "action:restart", agentId: "main" });
+          requestHeartbeatNow({ reason: "action:restart", agentId: "oversight" });
+          requestHeartbeatNow({ reason: "action:restart", agentId: "monitor" });
+          requestHeartbeatNow({ reason: "action:restart", agentId: "optimizer" });
+          gatewayLog.info("post-restart boot sequence complete — main and executives woken");
+        } catch (err) {
+          gatewayLog.error(`post-restart boot sequence error: ${String(err)}`);
+        }
+      }, 2000);
+
       await new Promise<void>((resolve) => {
         restartResolver = resolve;
       });

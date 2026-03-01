@@ -77,7 +77,19 @@ export function resolveDefaultAgentId(cfg: SkynetConfig): string {
     defaultAgentWarned = true;
     log.warn("Multiple agents marked default=true; using the first entry as default.");
   }
-  const chosen = (defaults[0] ?? agents[0])?.id?.trim();
+  if (defaults.length > 0) {
+    return normalizeAgentId(defaults[0]?.id?.trim() || DEFAULT_AGENT_ID);
+  }
+
+  // Always prefer "main" if it exists in the list - ensures the executive
+  // is always the default even if config gets reordered or regenerated.
+  const mainEntry = agents.find((a) => normalizeAgentId(a?.id) === "main");
+  if (mainEntry) {
+    return "main";
+  }
+
+  // Fallback to first entry
+  const chosen = agents[0]?.id?.trim();
   return normalizeAgentId(chosen || DEFAULT_AGENT_ID);
 }
 
@@ -142,10 +154,7 @@ export function resolveAgentConfig(
   };
 }
 
-export function resolveAgentSkillsFilter(
-  cfg: SkynetConfig,
-  agentId: string,
-): string[] | undefined {
+export function resolveAgentSkillsFilter(cfg: SkynetConfig, agentId: string): string[] | undefined {
   return normalizeSkillFilter(resolveAgentConfig(cfg, agentId)?.skills);
 }
 

@@ -1,49 +1,54 @@
-import { resolveAgentDir, resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
-import { writeConfigFile } from "../config/config.js";
-import { logConfigUpdated } from "../config/logging.js";
-import { resolveSessionTranscriptsDirForAgent } from "../config/sessions.js";
-import { DEFAULT_AGENT_ID, normalizeAgentId } from "../routing/session-key.js";
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
+import { createSkynet } from "../skynet/index.js";
 import { createClackPrompter } from "../wizard/clack-prompter.js";
-import { createQuietRuntime, requireValidConfig } from "./agents.command-shared.js";
-import { findAgentEntryIndex, listAgentEntries, pruneAgentConfig } from "./agents.config.js";
-import { moveToTrash } from "./onboard-helpers.js";
 
 type AgentsDeleteOptions = {
   id: string;
+  vault?: string;
   force?: boolean;
   json?: boolean;
 };
 
+/**
+ * `skynet agents delete <id>` — Removes a project and its manager from the Vault.
+ *
+ * Replaces the legacy config-based agent deletion. Instead of pruning
+ * skynet.json entries, this deletes the project directory from the Vault:
+ *
+ *   ~/.skynet/vault/projects/<name>/  (removed entirely)
+ */
 export async function agentsDeleteCommand(
   opts: AgentsDeleteOptions,
   runtime: RuntimeEnv = defaultRuntime,
 ) {
-  const cfg = await requireValidConfig(runtime);
-  if (!cfg) {
-    return;
-  }
-
+  const vaultPath = opts.vault?.trim() || "~/.skynet/vault";
   const input = opts.id?.trim();
+
   if (!input) {
-    runtime.error("Agent id is required.");
+    runtime.error("Project name is required. Usage: skynet agents delete <name>");
     runtime.exit(1);
     return;
   }
 
-  const agentId = normalizeAgentId(input);
-  if (agentId !== input) {
-    runtime.log(`Normalized agent id to "${agentId}".`);
-  }
-  if (agentId === DEFAULT_AGENT_ID) {
-    runtime.error(`"${DEFAULT_AGENT_ID}" cannot be deleted.`);
+  const projectName = input.toLowerCase();
+
+  if (projectName === "system") {
+    runtime.error('The "system" project cannot be deleted.');
     runtime.exit(1);
     return;
   }
 
-  if (findAgentEntryIndex(listAgentEntries(cfg), agentId) < 0) {
-    runtime.error(`Agent "${agentId}" not found.`);
+  const skynetSys = createSkynet({ vaultPath });
+  await skynetSys.initialize();
+
+  const vault = skynetSys.getVault();
+  const existing = await vault.getProject(projectName);
+
+  if (!existing) {
+    runtime.error(`Project "${projectName}" not found.`);
     runtime.exit(1);
     return;
   }
@@ -56,7 +61,7 @@ export async function agentsDeleteCommand(
     }
     const prompter = createClackPrompter();
     const confirmed = await prompter.confirm({
-      message: `Delete agent "${agentId}" and prune workspace/state?`,
+      message: `Delete project "${projectName}" and its manager? This cannot be undone.`,
       initialValue: false,
     });
     if (!confirmed) {
@@ -65,37 +70,31 @@ export async function agentsDeleteCommand(
     }
   }
 
-  const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
-  const agentDir = resolveAgentDir(cfg, agentId);
-  const sessionsDir = resolveSessionTranscriptsDirForAgent(agentId);
+  // Remove the entire project directory from the vault
+  const projectDir = path.join(
+    vaultPath.replace("~", process.env.HOME || ""),
+    "projects",
+    projectName,
+  );
 
-  const result = pruneAgentConfig(cfg, agentId);
-  await writeConfigFile(result.config);
-  if (!opts.json) {
-    logConfigUpdated(runtime);
+  try {
+    await fs.rm(projectDir, { recursive: true, force: true });
+  } catch (err) {
+    runtime.error(`Failed to remove project directory: ${(err as Error).message}`);
+    runtime.exit(1);
+    return;
   }
 
-  const quietRuntime = opts.json ? createQuietRuntime(runtime) : runtime;
-  await moveToTrash(workspaceDir, quietRuntime);
-  await moveToTrash(agentDir, quietRuntime);
-  await moveToTrash(sessionsDir, quietRuntime);
+  const payload = {
+    projectName,
+    projectDir,
+    deleted: true,
+  };
 
   if (opts.json) {
-    runtime.log(
-      JSON.stringify(
-        {
-          agentId,
-          workspace: workspaceDir,
-          agentDir,
-          sessionsDir,
-          removedBindings: result.removedBindings,
-          removedAllow: result.removedAllow,
-        },
-        null,
-        2,
-      ),
-    );
+    runtime.log(JSON.stringify(payload, null, 2));
   } else {
-    runtime.log(`Deleted agent: ${agentId}`);
+    runtime.log(`✅ Deleted project: ${projectName}`);
+    runtime.log(`   Removed: ${projectDir}`);
   }
 }

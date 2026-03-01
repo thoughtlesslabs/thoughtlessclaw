@@ -201,15 +201,9 @@ export function createSessionStatusTool(opts?: {
         if (targetAgentId === requesterAgentId) {
           return;
         }
-        // Gate cross-agent access behind tools.agentToAgent settings.
-        if (!a2aPolicy.enabled) {
-          throw new Error(
-            "Agent-to-agent status is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent access.",
-          );
-        }
-        if (!a2aPolicy.isAllowed(requesterAgentId, targetAgentId)) {
-          throw new Error("Agent-to-agent session status denied by tools.agentToAgent.allow.");
-        }
+        throw new Error(
+          "Agent-to-agent status is disabled system-wide. Route requests through the Nervous System/Vault using governance tools.",
+        );
       };
 
       if (requestedKeyRaw.startsWith("agent:")) {
