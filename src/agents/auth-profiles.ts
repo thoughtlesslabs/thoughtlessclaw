@@ -37,6 +37,7 @@ export {
   clearExpiredCooldowns,
   getSoonestCooldownExpiry,
   isProfileInCooldown,
+  tryCheckoutProfile,
   markAuthProfileCooldown,
   markAuthProfileFailure,
   markAuthProfileUsed,

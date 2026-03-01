@@ -37,6 +37,19 @@ function expectProfileErrorStateCleared(
   expect(stats?.disabledReason).toBeUndefined();
   expect(stats?.errorCount).toBe(0);
   expect(stats?.failureCounts).toBeUndefined();
+  expect(stats?.halfOpenActive).toBeFalsy();
+}
+
+function expectProfileHalfOpen(
+  stats: NonNullable<AuthProfileStore["usageStats"]>[string] | undefined,
+) {
+  expect(stats?.cooldownUntil).toBeUndefined();
+  expect(stats?.disabledUntil).toBeUndefined();
+  expect(stats?.disabledReason).toBeUndefined();
+  // Error counts are preserved during half-open so circuit breaker knows the severity
+  expect(stats?.errorCount).toBeGreaterThan(0);
+  expect(stats?.halfOpenActive).toBe(true);
+  expect(stats?.halfOpenTokens).toBe(3);
 }
 
 describe("resolveProfileUnusableUntil", () => {
@@ -209,7 +222,7 @@ describe("clearExpiredCooldowns", () => {
     expect(store.usageStats?.["anthropic:default"]?.errorCount).toBe(3);
   });
 
-  it("clears expired cooldownUntil and resets errorCount", () => {
+  it("clears expired cooldownUntil and transitions to half-open", () => {
     const store = makeStore({
       "anthropic:default": {
         cooldownUntil: Date.now() - 1_000,
@@ -222,14 +235,12 @@ describe("clearExpiredCooldowns", () => {
     expect(clearExpiredCooldowns(store)).toBe(true);
 
     const stats = store.usageStats?.["anthropic:default"];
-    expect(stats?.cooldownUntil).toBeUndefined();
-    expect(stats?.errorCount).toBe(0);
-    expect(stats?.failureCounts).toBeUndefined();
+    expectProfileHalfOpen(stats);
     // lastFailureAt preserved for failureWindowMs decay
     expect(stats?.lastFailureAt).toBeDefined();
   });
 
-  it("clears expired disabledUntil and disabledReason", () => {
+  it("clears expired disabledUntil and disabledReason to half-open", () => {
     const store = makeStore({
       "anthropic:default": {
         disabledUntil: Date.now() - 1_000,
@@ -242,10 +253,7 @@ describe("clearExpiredCooldowns", () => {
     expect(clearExpiredCooldowns(store)).toBe(true);
 
     const stats = store.usageStats?.["anthropic:default"];
-    expect(stats?.disabledUntil).toBeUndefined();
-    expect(stats?.disabledReason).toBeUndefined();
-    expect(stats?.errorCount).toBe(0);
-    expect(stats?.failureCounts).toBeUndefined();
+    expectProfileHalfOpen(stats);
   });
 
   it("handles independent expiry: cooldown expired but disabled still active", () => {
@@ -294,7 +302,7 @@ describe("clearExpiredCooldowns", () => {
     expect(stats?.errorCount).toBe(3);
   });
 
-  it("resets errorCount only when both cooldown and disabled have expired", () => {
+  it("transitions to half-open only when both cooldown and disabled have expired", () => {
     const store = makeStore({
       "anthropic:default": {
         cooldownUntil: Date.now() - 2_000,
@@ -308,7 +316,7 @@ describe("clearExpiredCooldowns", () => {
     expect(clearExpiredCooldowns(store)).toBe(true);
 
     const stats = store.usageStats?.["anthropic:default"];
-    expectProfileErrorStateCleared(stats);
+    expectProfileHalfOpen(stats);
   });
 
   it("processes multiple profiles independently", () => {
@@ -325,9 +333,8 @@ describe("clearExpiredCooldowns", () => {
 
     expect(clearExpiredCooldowns(store)).toBe(true);
 
-    // Anthropic: expired → cleared
-    expect(store.usageStats?.["anthropic:default"]?.cooldownUntil).toBeUndefined();
-    expect(store.usageStats?.["anthropic:default"]?.errorCount).toBe(0);
+    // Anthropic: expired → half-open
+    expectProfileHalfOpen(store.usageStats?.["anthropic:default"]);
 
     // OpenAI: still active → untouched
     expect(store.usageStats?.["openai:default"]?.cooldownUntil).toBeGreaterThan(Date.now());
@@ -344,8 +351,7 @@ describe("clearExpiredCooldowns", () => {
     });
 
     expect(clearExpiredCooldowns(store, fixedNow)).toBe(true);
-    expect(store.usageStats?.["anthropic:default"]?.cooldownUntil).toBeUndefined();
-    expect(store.usageStats?.["anthropic:default"]?.errorCount).toBe(0);
+    expectProfileHalfOpen(store.usageStats?.["anthropic:default"]);
   });
 
   it("clears cooldownUntil that equals exactly `now`", () => {
@@ -357,11 +363,9 @@ describe("clearExpiredCooldowns", () => {
       },
     });
 
-    // ts >= cooldownUntil → should clear (cooldown "until" means the instant
-    // at cooldownUntil the profile becomes available again).
+    // ts >= cooldownUntil → should clear
     expect(clearExpiredCooldowns(store, fixedNow)).toBe(true);
-    expect(store.usageStats?.["anthropic:default"]?.cooldownUntil).toBeUndefined();
-    expect(store.usageStats?.["anthropic:default"]?.errorCount).toBe(0);
+    expectProfileHalfOpen(store.usageStats?.["anthropic:default"]);
   });
 
   it("ignores NaN and Infinity cooldown values", () => {

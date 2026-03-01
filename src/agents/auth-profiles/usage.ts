@@ -31,6 +31,8 @@ export function resolveProfileUnusableUntil(
 
 /**
  * Check if a profile is currently in cooldown (due to rate limiting or errors).
+ * Does NOT check half-open concurrency limits. Use `tryCheckoutProfile` before
+ * dispatching actual work to respect circuit breakers.
  */
 export function isProfileInCooldown(store: AuthProfileStore, profileId: string): boolean {
   const stats = store.usageStats?.[profileId];
@@ -39,6 +41,79 @@ export function isProfileInCooldown(store: AuthProfileStore, profileId: string):
   }
   const unusableUntil = resolveProfileUnusableUntil(stats);
   return unusableUntil ? Date.now() < unusableUntil : false;
+}
+
+/**
+ * Attempts to check out a profile for use.
+ * 1. Returns false if the profile is strictly in a time-based cooldown.
+ * 2. If the profile was in cooldown but expired, it enters half-open.
+ * 3. While half-open, it decrements a concurrency token. If 0 remain, returns false.
+ * 4. If fully open, returns true.
+ *
+ * This writes to the Vault immediately when decrementing half-open tokens.
+ */
+export async function tryCheckoutProfile(params: {
+  store: AuthProfileStore;
+  profileId: string;
+  agentDir?: string;
+  now?: number;
+}): Promise<boolean> {
+  const { store, profileId, agentDir } = params;
+  const now = params.now ?? Date.now();
+
+  // 1. Fast path: if still in strict time cooldown, reject immediately without lock
+  if (isProfileInCooldown(store, profileId)) {
+    return false;
+  }
+
+  // 2. Lock & update step: safely clear expired cooldowns and/or decrement half-open tokens.
+  let allowed = true;
+  const updated = await updateAuthProfileStoreWithLock({
+    agentDir,
+    updater: (freshStore) => {
+      clearExpiredCooldowns(freshStore, now);
+
+      const stats = freshStore.usageStats?.[profileId];
+      if (!stats) {
+        return false; // fully open, no update needed
+      }
+
+      // Check strict cooldown again inside the lock
+      if (resolveProfileUnusableUntil(stats)) {
+        allowed = false;
+        return false;
+      }
+
+      // 3. Enforce circuit breaker concurrency limit
+      if (stats.halfOpenActive) {
+        if (typeof stats.halfOpenTokens === "number" && stats.halfOpenTokens > 0) {
+          stats.halfOpenTokens -= 1;
+          return true; // Token successfully claimed, store needs save
+        }
+        // Deny usage: all concurrent test tokens consumed until someone reports success or failure
+        allowed = false;
+        return false;
+      }
+
+      // Fully open, no mutation required for checkout
+      return false;
+    },
+  });
+
+  if (updated) {
+    // If the updater returned true and saved, update the in-memory cache
+    store.usageStats = updated.usageStats;
+  }
+
+  // Double check our local copy if not mutated in lock
+  if (!updated && allowed) {
+    const stats = store.usageStats?.[profileId];
+    if (stats?.halfOpenActive && (stats.halfOpenTokens ?? 0) <= 0) {
+      return false;
+    }
+  }
+
+  return allowed;
 }
 
 function isActiveUnusableWindow(until: number | undefined, now: number): boolean {
@@ -150,13 +225,9 @@ export function getSoonestCooldownExpiry(
  * Clear expired cooldowns from all profiles in the store.
  *
  * When `cooldownUntil` or `disabledUntil` has passed, the corresponding fields
- * are removed and error counters are reset so the profile gets a fresh start
- * (circuit-breaker half-open → closed). Without this, a stale `errorCount`
- * causes the *next* transient failure to immediately escalate to a much longer
- * cooldown — the root cause of profiles appearing "stuck" after rate limits.
- *
- * `cooldownUntil` and `disabledUntil` are handled independently: if a profile
- * has both and only one has expired, only that field is cleared.
+ * are removed. To prevent "thundering herd" rate limits upon recovery, profiles
+ * are transitioned into a `halfOpenActive` circuit-breaker state where only a
+ * limited number of concurrent test tokens are allowed.
  *
  * Mutates the in-memory store; disk persistence happens lazily on the next
  * store write (e.g. `markAuthProfileUsed` / `markAuthProfileFailure`), which
@@ -200,12 +271,14 @@ export function clearExpiredCooldowns(store: AuthProfileStore, now?: number): bo
       profileMutated = true;
     }
 
-    // Reset error counters when ALL cooldowns have expired so the profile gets
-    // a fair retry window. Preserves lastFailureAt for the failureWindowMs
-    // decay check in computeNextProfileUsageStats.
+    // When ALL cooldowns have expired, instead of fully clearing the error counts
+    // and opening the floodgates, we transition the profile to a half-open state.
+    // This allows a limited number of concurrent requests to test if the provider
+    // is actually healthy without causing a "thundering herd" 429 cascade.
     if (profileMutated && !resolveProfileUnusableUntil(stats)) {
-      stats.errorCount = 0;
-      stats.failureCounts = undefined;
+      stats.halfOpenActive = true;
+      // Allow 3 concurrent test attempts by default when transitioning from cooldown.
+      stats.halfOpenTokens = 3;
     }
 
     if (profileMutated) {
@@ -237,11 +310,13 @@ export async function markAuthProfileUsed(params: {
       freshStore.usageStats[profileId] = {
         ...freshStore.usageStats[profileId],
         lastUsed: Date.now(),
-        errorCount: 0,
+        errorCount: 0, // Fully close the circuit breaker on success
         cooldownUntil: undefined,
         disabledUntil: undefined,
         disabledReason: undefined,
         failureCounts: undefined,
+        halfOpenActive: false,
+        halfOpenTokens: undefined,
       };
       return true;
     },
@@ -263,6 +338,8 @@ export async function markAuthProfileUsed(params: {
     disabledUntil: undefined,
     disabledReason: undefined,
     failureCounts: undefined,
+    halfOpenActive: false,
+    halfOpenTokens: undefined,
   };
   saveAuthProfileStore(store, agentDir);
 }
@@ -382,6 +459,9 @@ function computeNextProfileUsageStats(params: {
     errorCount: nextErrorCount,
     failureCounts,
     lastFailureAt: params.now,
+    // Snap out of half-open immediately on failure
+    halfOpenActive: false,
+    halfOpenTokens: undefined,
   };
 
   if (params.reason === "billing") {
@@ -519,6 +599,8 @@ export async function clearAuthProfileCooldown(params: {
         disabledUntil: undefined,
         disabledReason: undefined,
         failureCounts: undefined,
+        halfOpenActive: false,
+        halfOpenTokens: undefined,
       };
       return true;
     },
@@ -538,6 +620,8 @@ export async function clearAuthProfileCooldown(params: {
     disabledUntil: undefined,
     disabledReason: undefined,
     failureCounts: undefined,
+    halfOpenActive: false,
+    halfOpenTokens: undefined,
   };
   saveAuthProfileStore(store, agentDir);
 }

@@ -50,6 +50,10 @@ export type ProfileUsageStats = {
   errorCount?: number;
   failureCounts?: Partial<Record<AuthProfileFailureReason, number>>;
   lastFailureAt?: number;
+  /** Whether the profile is currently in a circuit breaker half-open state. */
+  halfOpenActive?: boolean;
+  /** Number of concurrent attempts allowed while half-open. Decrements on dispatch. */
+  halfOpenTokens?: number;
 };
 
 export type AuthProfileStore = {

@@ -77,6 +77,10 @@ export class TickHandlerRegistry {
         await this.runDormantCheck();
       },
     });
+
+    const vault = (await this.getVault()) as import("../vault/manager.js").VaultManager;
+    const { createFailoverProbeHandler } = await import("./failover-probe.js");
+    this.handlers.set("failover-probe", createFailoverProbeHandler(vault));
   }
 
   private async runDormantCheck(): Promise<void> {

@@ -6,7 +6,7 @@ import {
 import {
   ensureAuthProfileStore,
   getSoonestCooldownExpiry,
-  isProfileInCooldown,
+  tryCheckoutProfile,
   resolveProfilesUnavailableReason,
   resolveAuthProfileOrder,
 } from "./auth-profiles.js";
@@ -315,7 +315,22 @@ export async function runWithModelFallback<T>(params: {
         store: authStore,
         provider: candidate.provider,
       });
-      const isAnyProfileAvailable = profileIds.some((id) => !isProfileInCooldown(authStore, id));
+
+      // Instead of just checking if ANY profile is available, we now try to
+      // securely check out a profile, respecting strict half-open concurrency limits.
+      let isAnyProfileAvailable = false;
+      for (const id of profileIds) {
+        // Enforce time-based cooldown and half-open token limits
+        const allowed = await tryCheckoutProfile({
+          store: authStore,
+          profileId: id,
+          agentDir: params.agentDir,
+        });
+        if (allowed) {
+          isAnyProfileAvailable = true;
+          break; // We found at least one viable profile we can use
+        }
+      }
 
       if (profileIds.length > 0 && !isAnyProfileAvailable) {
         // All profiles for this provider are in cooldown.
