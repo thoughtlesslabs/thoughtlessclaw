@@ -108,6 +108,30 @@ export class VaultManager {
 
         console.log(`[Vault] Migrated manager agent folder for: ${dir}`);
       }
+
+      const managerStatePath = path.join(this.basePath, `projects/${dir}/manager.json`);
+      if (!fsSync.existsSync(managerStatePath)) {
+        await fs.mkdir(path.dirname(managerStatePath), { recursive: true });
+        const state = {
+          id: `manager-${dir}`,
+          path: `projects/${dir}/manager.json`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          metadata: {},
+          type: "project_manager" as const,
+          projectName: dir,
+          projectType: dir === "system" ? ("system" as const) : ("project" as const),
+          status: "active" as const,
+          currentTaskId: null,
+          activeWorkers: [],
+          completedTasks: 0,
+          totalTasks: 0,
+          lastCheckIn: Date.now(),
+          blockers: [],
+        };
+        await fs.writeFile(managerStatePath, JSON.stringify(state, null, 2), "utf-8");
+        console.log(`[Vault] Created missing manager.json for project: ${dir}`);
+      }
     }
   }
 

@@ -107,11 +107,12 @@ export class TickHandlerRegistry {
           try {
             const { callGateway } = await import("../../gateway/call.js");
             await callGateway({
-              method: "chat.send",
+              method: "agent",
               params: {
                 sessionKey: manager.agentSessionId,
                 message: `[SYSTEM] WAKE: Protocol timeout. You have been dormant. You MUST invoke a governance tool to continue your WORKLOOP.`,
                 idempotencyKey: `wake-manager-${projectName}-${Date.now()}`,
+                label: `Manager: ${projectName}`,
               },
               timeoutMs: 30000,
             });
@@ -141,11 +142,12 @@ export class TickHandlerRegistry {
             try {
               const { callGateway } = await import("../../gateway/call.js");
               await callGateway({
-                method: "chat.send",
+                method: "agent",
                 params: {
                   sessionKey: worker.sessionId,
                   message: `[SYSTEM] WAKE: Protocol timeout. You have been dormant. You MUST invoke governance(complete-task) or another tool to proceed.`,
                   idempotencyKey: `wake-worker-${worker.id}-${Date.now()}`,
+                  label: `Worker: ${worker.id}`,
                 },
                 timeoutMs: 30000,
               });

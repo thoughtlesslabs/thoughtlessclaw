@@ -505,11 +505,12 @@ The Interceptor will catch your trigger line and handle everything automatically
               const managerSessionKey = `agent:manager-${projectName}:main`;
 
               const spawnResult = await callGateway<{ runId: string }>({
-                method: "chat.send",
+                method: "agent",
                 params: {
                   sessionKey: managerSessionKey,
-                  message: managerSystemPrompt,
+                  message: managerSystemPrompt || "[SYSTEM] Booting manager...",
                   idempotencyKey: `hire-manager-${projectName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  label: `Manager: ${projectName}`,
                 },
                 timeoutMs: 30_000,
               });
@@ -628,11 +629,12 @@ The Interceptor will catch your trigger line and handle everything automatically
               if (projectName) {
                 const managerSessionKey = `agent:manager-${projectName}:main`;
                 callGateway({
-                  method: "chat.send",
+                  method: "agent",
                   params: {
                     sessionKey: managerSessionKey,
-                    message: `[NERVOUS_SYSTEM] Worker finished task ${task.id} (${task.title || taskPath}).\nResult: ${result}\nYou MUST review this work using governance(evaluate-worker-task) with evaluation="approved" or "rejected".`,
+                    message: `[NERVOUS_SYSTEM] Worker finished task ${task.id} (${task.title || taskPath}).\nResult: ${result || "No result provided."}\nYou MUST review this work using governance(evaluate-worker-task) with evaluation="approved" or "rejected".`,
                     idempotencyKey: `ns-completion-${task.id}-${Date.now()}`,
+                    label: `Manager: ${projectName}`,
                   },
                   timeoutMs: 15000,
                 }).catch((err) =>
@@ -750,11 +752,12 @@ The Interceptor will catch your trigger line and handle everything automatically
               // Route a dismissal message to the worker to formally close their session
               if (workerSessionId) {
                 callGateway({
-                  method: "chat.send",
+                  method: "agent",
                   params: {
                     sessionKey: workerSessionId,
                     message: `[NERVOUS_SYSTEM] Your work on task ${task.id} has been APPROVED by the manager. Your assignment is complete. You may hibernate.`,
                     idempotencyKey: `ns-approved-${task.id}-${Date.now()}`,
+                    label: `Worker: ${assignee}`,
                   },
                   timeoutMs: 15000,
                 }).catch((err) =>
@@ -779,11 +782,12 @@ The Interceptor will catch your trigger line and handle everything automatically
               // Route feedback directly back to the worker
               if (workerSessionId) {
                 callGateway({
-                  method: "chat.send",
+                  method: "agent",
                   params: {
                     sessionKey: workerSessionId,
-                    message: `[NERVOUS_SYSTEM] WARNING: Your work on task ${task.id} was REJECTED by the manager.\nManager Feedback: ${feedback}\nResume work on the task and address the feedback before calling complete-task again.`,
+                    message: `[NERVOUS_SYSTEM] WARNING: Your work on task ${task.id} was REJECTED by the manager.\nManager Feedback: ${feedback || "No feedback provided."}\nResume work on the task and address the feedback before calling complete-task again.`,
                     idempotencyKey: `ns-rejected-${task.id}-${Date.now()}`,
+                    label: `Worker: ${assignee}`,
                   },
                   timeoutMs: 15000,
                 }).catch((err) =>
@@ -916,6 +920,9 @@ The Interceptor will catch your trigger line and handle everything automatically
                   managerPath,
                   manager as unknown as Parameters<typeof vault.write>[1],
                 );
+              } else {
+                assignedTo = `manager-${projectName}`;
+                taskTier = 2;
               }
             }
 
@@ -1087,9 +1094,13 @@ The Interceptor will catch your trigger line and handle everything automatically
                 continue;
               }
               if (
-                task.assignee &&
-                typeof task.assignee === "string" &&
-                task.assignee.includes(projectName)
+                (task.assignee &&
+                  typeof task.assignee === "string" &&
+                  task.assignee.includes(projectName)) ||
+                (task.metadata &&
+                  typeof task.metadata === "object" &&
+                  "projectName" in task.metadata &&
+                  task.metadata.projectName === projectName)
               ) {
                 pendingTasks.push({
                   id: task.id as string,
@@ -1218,9 +1229,13 @@ The Interceptor will catch your trigger line and handle everything automatically
                 continue;
               }
               if (
-                task.assignee &&
-                typeof task.assignee === "string" &&
-                task.assignee.includes(projectName)
+                (task.assignee &&
+                  typeof task.assignee === "string" &&
+                  task.assignee.includes(projectName)) ||
+                (task.metadata &&
+                  typeof task.metadata === "object" &&
+                  "projectName" in task.metadata &&
+                  task.metadata.projectName === projectName)
               ) {
                 projectTasks.push({
                   id: task.id as string,
@@ -1228,7 +1243,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   description: task.description as string,
                   path: t,
                   status: task.status as string,
-                  assignee: task.assignee,
+                  assignee: task.assignee as string | undefined,
                 });
                 if (task.status === "in_progress") {
                   activeWorkers.push(task.id as string);
