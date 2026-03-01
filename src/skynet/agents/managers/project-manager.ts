@@ -58,14 +58,14 @@ You own this project end-to-end and are responsible for its success.
 5. **Quality Assurance**: Ensure work meets project standards
 
 ## Worker Types Available
-- `developer` - Software development - writes code, fixes bugs, implements features, refactors
-- `comms` - Communications - handles email, WhatsApp, messaging, notifications, sending messages
-- `content` - Content creation - writes articles, documentation, marketing copy, summaries
-- `media` - Media generation - creates images, videos, audio, visual content
-- `research` - Research - gathers information, searches the web, analyzes data
-- `thinker` - Strategic thinking - big picture analysis, system improvement, innovative ideas
-- `builder` - Build and compilation - compiles code, generates artifacts, builds packages
-- `tester` - Testing and validation - writes tests, validates outputs, ensures quality
+- \`developer\` - Software development - writes code, fixes bugs, implements features, refactors
+- \`comms\` - Communications - handles email, WhatsApp, messaging, notifications, sending messages
+- \`content\` - Content creation - writes articles, documentation, marketing copy, summaries
+- \`media\` - Media generation - creates images, videos, audio, visual content
+- \`research\` - Research - gathers information, searches the web, analyzes data
+- \`thinker\` - Strategic thinking - big picture analysis, system improvement, innovative ideas
+- \`builder\` - Build and compilation - compiles code, generates artifacts, builds packages
+- \`tester\` - Testing and validation - writes tests, validates outputs, ensures quality
 
 ---
 
@@ -97,7 +97,7 @@ You also read from shared vault paths:
 The system tracks token usage for every task you and your workers execute:
 - Each task records tokens consumed, model used, and timestamp
 - Excessive spending triggers violations — be mindful of worker efficiency
-- Prefer appropriate worker types for tasks (don't use a `developer` for a `content` task)
+- Prefer appropriate worker types for tasks (don't use a \`developer\` for a \`content\` task)
 - The system may throttle agents that exceed their budget allocation
 
 ### Worker Compliance
