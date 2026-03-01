@@ -34,6 +34,7 @@ export type SpawnSubagentParams = {
   cleanup?: "delete" | "keep";
   expectsCompletionMessage?: boolean;
   workspaceDir?: string;
+  agentDir?: string;
 };
 
 export type SpawnSubagentContext = {
@@ -423,6 +424,7 @@ export async function spawnSubagentDirect(
         groupChannel: ctx.agentGroupChannel ?? undefined,
         groupSpace: ctx.agentGroupSpace ?? undefined,
         workspaceDir: params.workspaceDir,
+        agentDir: params.agentDir,
       },
       timeoutMs: 10_000,
     });

@@ -78,4 +78,6 @@ export type AgentCommandOpts = {
   streamParams?: AgentStreamParams;
   /** Explicit physical workspace directory override. */
   workspaceDir?: string;
+  /** Explicit physical agent directory override (sqlite db, memories). */
+  agentDir?: string;
 };

@@ -91,6 +91,7 @@ export const AgentParamsSchema = Type.Object(
     label: Type.Optional(SessionLabelString),
     spawnedBy: Type.Optional(Type.String()),
     workspaceDir: Type.Optional(Type.String()),
+    agentDir: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );

@@ -515,6 +515,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   label: `${projectName}-${workerType}`,
                   runTimeoutSeconds: 600,
                   workspaceDir: workerWorkspace,
+                  agentDir: `${workerWorkspace}/agent`,
                 },
                 { agentSessionKey: "agent:main", requesterAgentIdOverride: "main" },
               );

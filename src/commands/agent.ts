@@ -284,7 +284,7 @@ export async function agentCommand(
       config: cfg,
     });
   const workspaceDirRaw = opts.workspaceDir ?? resolveAgentWorkspaceDir(cfg, sessionAgentId);
-  const agentDir = resolveAgentDir(cfg, sessionAgentId);
+  const agentDir = opts.agentDir ?? resolveAgentDir(cfg, sessionAgentId);
   const workspace = await ensureAgentWorkspace({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap,
