@@ -188,10 +188,74 @@ export class ExecutiveCollaboration {
     const collaboration = new ExecutiveCollaboration(vault, proposalId);
 
     const executives: ExecutiveRole[] = ["oversight", "monitor", "optimizer"];
+
+    const { runEmbeddedPiAgent } = await import("../../../agents/pi-embedded-runner/run.js");
+    const { createExecutiveAgent } = await import("./executive.js");
+    const { resolveStateDir } = await import("../../../config/paths.js");
+    const path = await import("node:path");
+    const workspaceDir = path.join(resolveStateDir(), "workspace");
+
     const tasks = executives.map(async (exec) => {
-      await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 200));
-      const vote: "approve" | "reject" | "abstain" = Math.random() > 0.2 ? "approve" : "abstain";
-      await collaboration.submitVote(exec, vote);
+      try {
+        const agent = createExecutiveAgent(vault, exec);
+        const prompt = `You have been asked to review a proposal from the ${requester} executive.
+        
+REQUEST:
+${request}
+
+PROPOSED PLAN:
+${plan}
+
+Evaluate this proposal against your specific directives and responsibilities.
+
+Reply format MUST be exactly:
+VOTE: <APPROVE|REJECT|ABSTAIN>
+REASON: <Provide brief, actionable feedback or improvements based on your role>`;
+
+        const sessionId = `eval-${exec}-${Date.now()}`;
+        const sessionFile = path.join(workspaceDir, "sessions", `${sessionId}.jsonl`);
+
+        const result = await runEmbeddedPiAgent({
+          sessionId,
+          sessionFile,
+          workspaceDir,
+          prompt,
+          extraSystemPrompt: agent.getSystemPrompt(),
+          runId: `proposal-${proposalId}-${exec}`,
+          disableMessageTool: true,
+          timeoutMs: 60000,
+        });
+
+        const outputs =
+          result.payloads
+            ?.filter((p: { text?: string }) => p.text)
+            .map((p: { text?: string }) => p.text) || [];
+        const text = outputs.join("\n").trim();
+
+        let vote: "approve" | "reject" | "abstain" = "abstain";
+        let reason = "No reason provided.";
+
+        if (text) {
+          const voteMatch = text.match(/VOTE:\s*(APPROVE|REJECT|ABSTAIN)/i);
+          if (voteMatch && voteMatch[1]) {
+            vote = voteMatch[1].toLowerCase() as "approve" | "reject" | "abstain";
+          }
+          const reasonMatch = text.match(/REASON:\s*([\s\S]*)/i);
+          if (reasonMatch && reasonMatch[1]) {
+            reason = reasonMatch[1].trim();
+          } else {
+            reason = text;
+          }
+        }
+
+        if (reason && reason !== "No reason provided.") {
+          await collaboration.addImprovement(exec, reason);
+        }
+        await collaboration.submitVote(exec, vote, reason);
+      } catch (err) {
+        console.error(`[Collaboration] ${exec} failed to vote:`, err);
+        await collaboration.submitVote(exec, "abstain", "Error during evaluation");
+      }
     });
 
     await Promise.all(tasks);
