@@ -86,10 +86,9 @@ export function createFailoverProbeHandler(_vaultMgr: VaultManager): TickHandler
 }
 
 async function pingProvider(_provider: string): Promise<boolean> {
-  // A proactive model ping implementation.
-  // In reality, this would dynamically import the relevant adapter
-  // (via src/agents/model-selection.ts) and fire a 1-message hello.
-  // We mock a 50% recovery chance for the simulation.
-  await new Promise((r) => setTimeout(r, 500));
-  return Math.random() > 0.5;
+  // A true proactive 1-token model ping should be implemented here in the future.
+  // For now, we return false to enforce strict adherence to the calculated natural 
+  // exponential backoff cooldowns, preventing the 50% artificial simulated healing
+  // from repeatedly crashing into active rate limit walls.
+  return false;
 }
