@@ -135,19 +135,15 @@ export function validateAnthropicTurns(messages: AgentMessage[]): AgentMessage[]
         }
         return true;
       }
-      const rec = block as { type?: unknown; text?: unknown };
-      if (rec.type === "text" && typeof rec.text === "string" && rec.text.trim() === "") {
+      const rec = block as Record<string, unknown>;
+      // Anthropic does not allow empty text blocks inside lists
+      if (rec.type === "text" && typeof rec.text === "string" && !rec.text.trim()) {
         return false;
       }
       return true;
     });
 
-    // If we filtered out all blocks, keep at least one placeholder so the message isn't empty
-    // (though in practice it should have an image or we'd just drop the message entirely).
-    if (filteredContent.length === 0 && msgWithContent.content.length > 0) {
-      filteredContent.push({ type: "text", text: "(empty)" });
-    } else if (filteredContent.length === 0 && msgWithContent.content.length === 0) {
-      // Catch empty arrays that were already empty
+    if (filteredContent.length === 0) {
       filteredContent.push({ type: "text", text: "(empty)" });
     }
 
