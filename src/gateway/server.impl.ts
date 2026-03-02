@@ -45,6 +45,7 @@ import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
 import { getTotalQueueSize } from "../process/command-queue.js";
 import type { RuntimeEnv } from "../runtime.js";
+import { workerLifecycleHook } from "../skynet/proactive/worker-lifecycle-hook.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
@@ -312,6 +313,13 @@ export async function startGatewayServer(
         coreGatewayHandlers,
         baseMethods,
       });
+
+  pluginRegistry.typedHooks.push({
+    pluginId: "system",
+    hookName: workerLifecycleHook.hookName,
+    handler: workerLifecycleHook.handler,
+    source: "skynet-system",
+  });
   const channelLogs = Object.fromEntries(
     listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]),
   ) as Record<ChannelId, ReturnType<typeof createSubsystemLogger>>;
@@ -728,35 +736,36 @@ export async function startGatewayServer(
     }
   }
 
+  // Reload handler
+  const { applyHotReload, requestGatewayRestart } = createGatewayReloadHandlers({
+    deps,
+    broadcast,
+    getState: () => ({
+      hooksConfig,
+      heartbeatRunner,
+      cronState,
+      browserControl,
+    }),
+    setState: (nextState) => {
+      hooksConfig = nextState.hooksConfig;
+      heartbeatRunner = nextState.heartbeatRunner;
+      cronState = nextState.cronState;
+      cron = cronState.cron;
+      cronStorePath = cronState.storePath;
+      browserControl = nextState.browserControl;
+    },
+    startChannel,
+    stopChannel,
+    logHooks,
+    logBrowser,
+    logChannels,
+    logCron,
+    logReload,
+  });
+
   const configReloader = minimalTestGateway
     ? { stop: async () => {} }
     : (() => {
-        const { applyHotReload, requestGatewayRestart } = createGatewayReloadHandlers({
-          deps,
-          broadcast,
-          getState: () => ({
-            hooksConfig,
-            heartbeatRunner,
-            cronState,
-            browserControl,
-          }),
-          setState: (nextState) => {
-            hooksConfig = nextState.hooksConfig;
-            heartbeatRunner = nextState.heartbeatRunner;
-            cronState = nextState.cronState;
-            cron = cronState.cron;
-            cronStorePath = cronState.storePath;
-            browserControl = nextState.browserControl;
-          },
-          startChannel,
-          stopChannel,
-          logHooks,
-          logBrowser,
-          logChannels,
-          logCron,
-          logReload,
-        });
-
         return startGatewayConfigReloader({
           initialConfig: cfgAtStart,
           readSnapshot: readConfigFileSnapshot,

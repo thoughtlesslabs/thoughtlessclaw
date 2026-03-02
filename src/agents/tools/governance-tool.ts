@@ -1339,6 +1339,41 @@ The Interceptor will catch your trigger line and handle everything automatically
               });
             }
 
+            // -------------------------------------
+            // Prevent Manager-Driven Rate Limit Death Spirals
+            // Do not attempt to spawn ANY workers if the core LLM supply is fully exhausted
+            try {
+              const { resolveUserPath } = await import("../../utils.js");
+              const fs = await import("node:fs/promises");
+              const path = await import("node:path");
+              const healthPath = path.join(resolveUserPath("~/.skynet"), "provider-health.json");
+              if (
+                await fs
+                  .stat(healthPath)
+                  .then(() => true)
+                  .catch(() => false)
+              ) {
+                const rawHealth = await fs.readFile(healthPath, "utf-8");
+                const healthData = JSON.parse(rawHealth) as Record<string, { status: string }>;
+                const hasAvailableProvider = Object.values(healthData).some(
+                  (p) => p.status === "healthy" || p.status === "half-open",
+                );
+
+                if (!hasAvailableProvider && Object.keys(healthData).length > 0) {
+                  return jsonResult({
+                    success: false,
+                    error:
+                      "Provider Cooldown: All routing models are currently rate-limited. Task assignment paused.",
+                    directive:
+                      "[NERVOUS_SYSTEM] Failed to claim pending tasks because all API proxies are RATE LIMITED. Yield control (hibernate) and retry later.",
+                  });
+                }
+              }
+            } catch {
+              // Non-fatal if health file isn't ready
+            }
+            // -------------------------------------
+
             const workerTypes = Object.keys(WORKER_CONFIGS) as Array<keyof typeof WORKER_CONFIGS>;
             const started: string[] = [];
 
