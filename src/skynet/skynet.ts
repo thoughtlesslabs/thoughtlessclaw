@@ -68,7 +68,12 @@ export class Skynet {
     });
 
     // Save manager sessions before shutdown
+    let isExiting = false;
     process.on("beforeExit", async () => {
+      if (isExiting) {
+        return;
+      }
+      isExiting = true;
       await this.saveManagerSessions();
     });
 
