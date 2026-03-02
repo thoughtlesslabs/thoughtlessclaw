@@ -1341,6 +1341,48 @@ The Interceptor will catch your trigger line and handle everything automatically
               });
             }
 
+            // --- Enforce Max Concurrent Workers ---
+            const maxConcurrent = (manager.maxConcurrentWorkers as number) || 3;
+            // Count how many tasks are ALREADY in_progress
+            let currentActiveCount = 0;
+            for (const t of allTasks) {
+              if (t.endsWith(".json")) {
+                const task = (await vault.read(`tasks/${t}`)) as unknown as Record<
+                  string,
+                  unknown
+                > | null;
+                if (
+                  task &&
+                  task.status === "in_progress" &&
+                  ((task.assignee &&
+                    typeof task.assignee === "string" &&
+                    task.assignee.includes(projectName)) ||
+                    (task.metadata &&
+                      typeof task.metadata === "object" &&
+                      "projectName" in task.metadata &&
+                      task.metadata.projectName === projectName))
+                ) {
+                  currentActiveCount++;
+                }
+              }
+            }
+
+            const availableSlots = Math.max(0, maxConcurrent - currentActiveCount);
+
+            if (availableSlots === 0) {
+              return jsonResult({
+                success: true,
+                type: "manager-activated",
+                projectName,
+                tasksStarted: 0,
+                message: `At max concurrency (${maxConcurrent} active workers)`,
+              });
+            }
+
+            // Truncate the pending tasks list to only fill the available slots
+            const tasksToStart = pendingTasks.slice(0, availableSlots);
+            // -------------------------------------
+
             // -------------------------------------
             // Prevent Manager-Driven Rate Limit Death Spirals
             // Do not attempt to spawn ANY workers if the core LLM supply is fully exhausted
@@ -1379,7 +1421,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const workerTypes = Object.keys(WORKER_CONFIGS) as Array<keyof typeof WORKER_CONFIGS>;
             const started: string[] = [];
 
-            for (const task of pendingTasks) {
+            for (const task of tasksToStart) {
               const taskTitle = task.title.toLowerCase();
               const taskDesc = task.description.toLowerCase();
               const combined = `${taskTitle} ${taskDesc}`;
