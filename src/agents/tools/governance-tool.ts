@@ -159,6 +159,8 @@ const GovernanceConsultSchema = Type.Object({
   taskId: Type.Optional(Type.String()),
   description: Type.Optional(Type.String()),
   workerId: Type.Optional(Type.String()),
+  workerSessionId: Type.Optional(Type.String()),
+  sessionId: Type.Optional(Type.String()),
   taskPath: Type.Optional(Type.String()),
   result: Type.Optional(Type.String()),
   title: Type.Optional(Type.String()),
@@ -1412,6 +1414,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 rewardPoints: 100,
                 violations: [],
                 capabilities: [workerType],
+                sessionId: `worker:${workerId}`,
               };
 
               await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
@@ -1607,6 +1610,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                     rewardPoints: 100,
                     violations: [],
                     capabilities: [workerType],
+                    sessionId: `worker:${workerId}`,
                   };
                   await vault.write(existingWorkerPath, workerState);
                   syncedWorkers.push(`${task.id}:${workerType}`);
