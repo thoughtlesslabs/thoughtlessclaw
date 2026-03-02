@@ -1488,7 +1488,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   spawnedBy: manager.id,
                   execute: true,
                 },
-                timeoutMs: 0, // don't block tool execution
+                timeoutMs: 30000, // don't block tool execution, but allow time for spawn
               });
 
               // Don't silently fail - track spawn results

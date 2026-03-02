@@ -379,7 +379,69 @@ ${new Date().toISOString()}
       `[ProjectManager:${this.config.projectName}] Executing with ${workerType}: ${task.title}`,
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Actually spawn the worker via governance
+    const { callGatewayTool } = await import("../../../agents/tools/gateway.js");
+
+    const workerPrompt = `# You are a ${workerType} worker
+
+## Task
+**Title:** ${task.title}
+**Description:** ${task.description}
+
+## Instructions
+1. Complete this task using your available tools
+2. When done, output: DONE: <summary of what you accomplished>
+3. If blocked, output: BLOCKER: <what is blocking you>
+4. If errors occur, output: ERRORS: <what went wrong>
+
+## Project Context
+- Project: ${this.config.projectName}
+- Task ID: ${task.id}
+- Task Path: ${task.path}
+
+Your work will be reviewed by the project manager.`;
+
+    const workerId = `worker-${workerType}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const _sessionKey = `worker:${workerId}`;
+
+    try {
+      const result = await callGatewayTool<{ status: string; childSessionKey?: string }>(
+        "agent",
+        {},
+        {
+          sessionKey: `worker:${workerId}`,
+          message: workerPrompt,
+          idempotencyKey: `spawn-${workerId}`,
+          label: `Worker: ${workerType}`,
+          workspaceDir: `projects/${this.config.projectName}/workers/${workerId}`,
+          spawnedBy: this.managerId,
+        },
+      );
+
+      if (result?.status === "accepted" || result?.status === "success") {
+        console.log(
+          `[ProjectManager:${this.config.projectName}] Worker ${workerId} spawned successfully`,
+        );
+
+        // Update task with worker info
+        task.assignee = workerId;
+        await this.vault.write(task.path, task);
+
+        // Track the worker
+        this.activeWorkers.set(workerId, {
+          taskId: task.id,
+          spawnedAt: Date.now(),
+        });
+      } else {
+        throw new Error(`Worker spawn rejected by gateway: ${JSON.stringify(result)}`);
+      }
+    } catch (err) {
+      console.error(
+        `[ProjectManager:${this.config.projectName}] Failed to spawn ${workerType} worker:`,
+        err,
+      );
+      throw err;
+    }
   }
 
   async checkInWithMain(): Promise<ProjectManagerState> {
