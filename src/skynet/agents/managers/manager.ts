@@ -143,18 +143,19 @@ ${new Date().toISOString()}
 
     const workerTypes = ["analyzer", "coder", "reporter", "builder", "tester"] as const;
     const workerType = workerTypes[Math.floor(Math.random() * workerTypes.length)];
+    const workerId = `skynet-${workerType}-${Date.now()}`;
 
     const workerState: AgentState = {
-      id: `skynet-${workerType}-${Date.now()}`,
-      path: `agents/workers/skynet-${workerType}.json`,
+      id: workerId,
+      path: `agents/workers/${workerId}.json`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       metadata: {},
       type: "agent_state",
-      agentId: `skynet-${workerType}`,
+      agentId: workerId,
       role: "worker",
       tier: 3,
-      status: "awake",
+      status: "working",
       lastWake: Date.now(),
       lastSleep: 0,
       currentTaskId: subtask.id,
@@ -163,7 +164,50 @@ ${new Date().toISOString()}
       capabilities: [workerType],
     };
 
-    await this.vault.write(`agents/workers/skynet-${workerType}.json`, workerState);
+    await this.vault.write(`agents/workers/${workerId}.json`, workerState);
+
+    // Actually spawn the worker process via gateway tool
+    console.log(`[Manager:${this.managerId}] Spawning real worker ${workerId} for subtask: ${subtask.id}`);
+    try {
+      const { callGatewayTool } = await import("../../../agents/tools/gateway.js");
+      const { ensureSkynetModelsJson } = await import("../../../agents/models-config.js");
+      const { resolveSkynetAgentDir } = await import("../../../agents/agent-paths.js");
+
+      const config = (globalThis as any).__skynet_config; // Assumes config is available via DI or global 
+      await ensureSkynetModelsJson(config, resolveSkynetAgentDir());
+
+      const prompt = `You are a specialist Tier 3 Skynet Worker (${workerType}).
+      
+SUBTASK ASSIGNMENT:
+ID: ${subtask.id}
+TITLE: ${subtask.title}
+DESCRIPTION: ${subtask.description}
+
+Review your directives and get to work making progress on this task. When finished, use the DONE: prefix and list ARTIFACTS: logging out your work.`;
+
+      const spawnResult = await callGatewayTool("agent", {}, {
+        sessionKey: `worker:${workerId}`,
+        sessionId: workerId,
+        sessionFile: workerId,
+        messageChannel: "governance",
+        messageProvider: "governance",
+        message: prompt,
+        config,
+        metadata: {
+          taskId: subtask.id,
+          workerType: workerType,
+          spawnedBy: this.managerId,
+          execute: true
+        }
+      });
+
+      console.log(`[Manager:${this.managerId}] Worker ${workerId} spawn result:`, spawnResult);
+    } catch (err) {
+      console.error(`[Manager:${this.managerId}] Failed to spawn worker ${workerId}:`, err);
+      workerState.status = "waiting";
+      await this.vault.write(`agents/workers/${workerId}.json`, workerState);
+    }
+
     return this;
   }
 
