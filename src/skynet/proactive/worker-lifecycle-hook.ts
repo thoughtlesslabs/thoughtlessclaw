@@ -1,5 +1,5 @@
-import { parseAgentSessionKey } from "../../gateway/server-methods/session-utils.js";
-import type { PluginRegistryContext, ExecutableHookPlugin } from "../../plugins/types.js";
+import type { PluginHookHandlerMap } from "../../plugins/types.js";
+import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
 
 /**
  * A global hook that listens to the `subagent_ended` lifecycle event.
@@ -8,9 +8,12 @@ import type { PluginRegistryContext, ExecutableHookPlugin } from "../../plugins/
  * resets its assigned task from "in_progress" back to "pending" so the manager
  * can retry assigning it when API capacity returns.
  */
-export const workerLifecycleHook: ExecutableHookPlugin<"subagent_ended"> = {
+export const workerLifecycleHook: {
+  hookName: "subagent_ended";
+  handler: PluginHookHandlerMap["subagent_ended"];
+} = {
   hookName: "subagent_ended",
-  handler: async (event, _ctx: PluginRegistryContext) => {
+  handler: async (event, _ctx) => {
     // We only care about subagents that failed
     if (event.outcome !== "error") {
       return;
@@ -40,7 +43,10 @@ export const workerLifecycleHook: ExecutableHookPlugin<"subagent_ended"> = {
       }
 
       const workerPath = `projects/${projectName}/workers/${workerId}.json`;
-      const workerState = (await vault.read(workerPath)) as Record<string, unknown> | null;
+      const workerState = (await vault.read(workerPath)) as unknown as Record<
+        string,
+        unknown
+      > | null;
 
       if (!workerState) {
         return;
@@ -56,17 +62,17 @@ export const workerLifecycleHook: ExecutableHookPlugin<"subagent_ended"> = {
       workerState.violations = Array.isArray(workerState.violations) ? workerState.violations : [];
       const errorMessage = event.error || event.reason || "Unknown API/Lifecycle error";
       (workerState.violations as string[]).push(`Subagent crashed: ${errorMessage}`);
-      await vault.write(workerPath, workerState);
+      await vault.write(workerPath, workerState as unknown as Parameters<typeof vault.write>[1]);
 
       // 2. Heal the associated task, switching it back to pending
       const taskId = workerState.currentTaskId;
       if (taskId && typeof taskId === "string") {
         const taskPath = `tasks/${taskId}.json`;
-        const task = (await vault.read(taskPath)) as Record<string, unknown> | null;
+        const task = (await vault.read(taskPath)) as unknown as Record<string, unknown> | null;
         if (task && task.status === "in_progress") {
           task.status = "pending";
           task.updatedAt = Date.now();
-          await vault.write(taskPath, task);
+          await vault.write(taskPath, task as unknown as Parameters<typeof vault.write>[1]);
           console.log(
             `[worker-lifecycle] Successfully recycled task ${taskId} from in_progress -> pending`,
           );
@@ -79,12 +85,14 @@ export const workerLifecycleHook: ExecutableHookPlugin<"subagent_ended"> = {
 };
 
 // Helper to quickly find which project a worker belongs to
-async function findProjectForWorker(vault: unknown, workerId: string): Promise<string | null> {
-  const v = vault as {
+async function findProjectForWorker(
+  vault: {
     list: (p: string) => Promise<string[]>;
     read: (p: string) => Promise<unknown>;
-  };
-  const projects = await v.list("projects/");
+  },
+  workerId: string,
+): Promise<string | null> {
+  const projects = await vault.list("projects/");
   for (const p of projects) {
     // skip files
     if (p.endsWith(".json") || p.endsWith(".md")) {
