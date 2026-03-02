@@ -5,10 +5,7 @@ import { delimiter, dirname, join } from "node:path";
 import { isWSL2Sync } from "skynet/plugin-sdk";
 
 const CLIENT_ID_KEYS = ["SKYNET_GEMINI_OAUTH_CLIENT_ID", "GEMINI_CLI_OAUTH_CLIENT_ID"];
-const CLIENT_SECRET_KEYS = [
-  "SKYNET_GEMINI_OAUTH_CLIENT_SECRET",
-  "GEMINI_CLI_OAUTH_CLIENT_SECRET",
-];
+const CLIENT_SECRET_KEYS = ["SKYNET_GEMINI_OAUTH_CLIENT_SECRET", "GEMINI_CLI_OAUTH_CLIENT_SECRET"];
 const REDIRECT_URI = "http://localhost:8085/oauth2callback";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -93,6 +90,13 @@ export function extractGeminiCliCredentials(): { clientId: string; clientSecret:
         "code_assist",
         "oauth2.js",
       ),
+      // Arch Linux `pacman` and some global npm installs place the binary in /usr/bin
+      // but the actual node_modules directory in /usr/lib/node_modules/gemini-cli.
+      "/usr/lib/node_modules/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+      "/usr/lib/node_modules/gemini-cli/node_modules/@google/gemini-cli-core/dist/code_assist/oauth2.js",
+      // Homebrew fallback paths just in case realpathSync didn't escape the cellar symlinks completely
+      "/opt/homebrew/lib/node_modules/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+      "/usr/local/lib/node_modules/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
     ];
 
     let content: string | null = null;
@@ -103,9 +107,20 @@ export function extractGeminiCliCredentials(): { clientId: string; clientSecret:
       }
     }
     if (!content) {
-      const found = findFile(geminiCliDir, "oauth2.js", 10);
-      if (found) {
-        content = readFileSync(found, "utf8");
+      const fallbackDirs = [
+        geminiCliDir,
+        "/usr/lib/node_modules/gemini-cli",
+        "/opt/homebrew/lib/node_modules/gemini-cli",
+        "/usr/local/lib/node_modules/gemini-cli",
+      ];
+      for (const dir of fallbackDirs) {
+        if (existsSync(dir)) {
+          const found = findFile(dir, "oauth2.js", 10);
+          if (found) {
+            content = readFileSync(found, "utf8");
+            break;
+          }
+        }
       }
     }
     if (!content) {
