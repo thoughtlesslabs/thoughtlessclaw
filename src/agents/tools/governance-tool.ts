@@ -1436,7 +1436,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               // Immediately wake a subagent to begin processing this task
               const workerPrompt = `# You are a ${WORKER_CONFIGS[workerType as keyof typeof WORKER_CONFIGS]?.description || workerType}\n\nTask: ${task.description}\n\nComplete this task and report back using \`governance(complete-task)\`.`;
               const { callGateway } = await import("../../gateway/call.js");
-              callGateway({
+              const spawnPromise = callGateway({
                 method: "agent",
                 params: {
                   sessionKey: `worker:${workerId}`,
@@ -1448,7 +1448,39 @@ The Interceptor will catch your trigger line and handle everything automatically
                   execute: true,
                 },
                 timeoutMs: 0, // don't block tool execution
-              }).catch((err) => console.error("[activate-manager] Worker spawn failed:", err));
+              });
+
+              // Don't silently fail - track spawn results
+              spawnPromise.catch((err) => {
+                console.error(`[activate-manager] Worker spawn failed:`, err);
+
+                // If spawn failed, mark task as 'pending' so it can retry next run
+                vault
+                  .read(task.path)
+                  .then((taskUpdate) => {
+                    if (taskUpdate && typeof taskUpdate === "object") {
+                      const updatedTask = taskUpdate as unknown as Record<string, unknown>;
+                      if (updatedTask.status === "in_progress") {
+                        updatedTask.status = "pending";
+                        updatedTask.assignee = undefined;
+                        vault
+                          .write(
+                            task.path,
+                            updatedTask as unknown as Parameters<typeof vault.write>[1],
+                          )
+                          .catch((e) => {
+                            console.error(
+                              `[activate-manager] Failed to release dead task ${task.id}:`,
+                              e,
+                            );
+                          });
+                      }
+                    }
+                  })
+                  .catch((e) =>
+                    console.error(`[activate-manager] Failed to read dead task ${task.id}:`, e),
+                  );
+              });
             }
 
             manager.lastCheckIn = Date.now();
