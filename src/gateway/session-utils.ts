@@ -159,6 +159,10 @@ export function deriveSessionTitle(
     return entry.displayName.trim();
   }
 
+  if (entry.label?.trim()) {
+    return entry.label.trim();
+  }
+
   if (entry.subject?.trim()) {
     return entry.subject.trim();
   }
@@ -414,10 +418,7 @@ function resolveDefaultStoreAgentId(cfg: SkynetConfig): string {
   return normalizeAgentId(resolveDefaultAgentId(cfg));
 }
 
-export function resolveSessionStoreKey(params: {
-  cfg: SkynetConfig;
-  sessionKey: string;
-}): string {
+export function resolveSessionStoreKey(params: { cfg: SkynetConfig; sessionKey: string }): string {
   const raw = (params.sessionKey ?? "").trim();
   if (!raw) {
     return raw;

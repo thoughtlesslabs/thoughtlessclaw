@@ -351,9 +351,20 @@ describe("deriveSessionTitle", () => {
       sessionId: "abc123",
       updatedAt: Date.now(),
       displayName: "My Custom Session",
+      label: "My Label",
       subject: "Group Chat",
     } as SessionEntry;
     expect(deriveSessionTitle(entry)).toBe("My Custom Session");
+  });
+
+  test("prefers label over subject and first user message", () => {
+    const entry = {
+      sessionId: "abc123",
+      updatedAt: Date.now(),
+      label: "My Explicit Label",
+      subject: "Group Chat",
+    } as SessionEntry;
+    expect(deriveSessionTitle(entry, "Hello")).toBe("My Explicit Label");
   });
 
   test("falls back to subject when displayName is missing", () => {

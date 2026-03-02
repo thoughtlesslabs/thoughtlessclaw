@@ -1399,6 +1399,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   label: `Worker: ${workerType}`,
                   workspaceDir: `projects/${projectName}/workers/${workerId}`,
                   spawnedBy: manager.id,
+                  execute: true,
                 },
                 timeoutMs: 0, // don't block tool execution
               }).catch((err) => console.error("[activate-manager] Worker spawn failed:", err));
