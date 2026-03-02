@@ -927,13 +927,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 if (worker) {
                   workerSessionId = worker.sessionId || null;
                   if (evaluation === "approved") {
-                    worker.status = "completed";
-                    worker.completedAt = Date.now();
-                    worker.doneMessage = task.doneMessage;
-                    await vault.write(
-                      workerPath,
-                      worker as unknown as Parameters<typeof vault.write>[1],
-                    );
+                    await vault.delete(workerPath);
                   }
                 }
               }

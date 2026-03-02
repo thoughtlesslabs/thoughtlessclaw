@@ -93,6 +93,86 @@ export class TickHandlerRegistry {
         await this.runProviderHealthSync();
       },
     });
+
+    this.handlers.set("task-healer", {
+      name: "task-healer",
+      description:
+        "Periodically sweep the Vault for orphaned or stuck 'in_progress' tasks bound to crashed workers",
+      intervalMs: 5 * 60000,
+      lastRun: 0,
+      enabled: true,
+      run: async () => {
+        await this.runTaskHealer();
+      },
+    });
+  }
+
+  private async runTaskHealer(): Promise<void> {
+    try {
+      const vault = await this.getVault();
+      const vaultMgr = vault as import("../vault/manager.js").VaultManager;
+      const tasksFiles = await vaultMgr.list(`tasks/`);
+      const now = Date.now();
+      const STUCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+      let resetCount = 0;
+      let healedCount = 0;
+
+      for (const tf of tasksFiles) {
+        if (!tf.endsWith(".json")) {
+          continue;
+        }
+        const taskPath = `tasks/${tf}`;
+        const task = await vaultMgr.read(taskPath);
+
+        if (!task || typeof task !== "object") {
+          continue;
+        }
+
+        let changed = false;
+
+        // Auto-heal tasks that are stuck "in_progress" for more than 2 hours
+        // (This catches Negative Runtime crashed workers)
+        if (task.status === "in_progress") {
+          const lastActivity = task.updatedAt || task.createdAt || 0;
+          if (now - lastActivity > STUCK_TIMEOUT_MS) {
+            console.log(
+              `[task-healer] Found stuck task ${task.id} (inactive > 2hrs). Resetting to pending.`,
+            );
+            task.status = "pending";
+            task.updatedAt = now;
+            changed = true;
+            resetCount++;
+          }
+        }
+
+        // Auto-heal "pending" tasks lacking proper assignee bindings
+        if (task.status === "pending" && (!task.assignee || task.assignee === "")) {
+          const projectName = task.metadata?.projectName as string | undefined;
+          if (projectName) {
+            console.log(
+              `[task-healer] Found orphaned task ${task.id}. Rebinding to ${projectName} manager.`,
+            );
+            task.assignee = `manager-${projectName}`;
+            task.updatedAt = now;
+            changed = true;
+            healedCount++;
+          }
+        }
+
+        if (changed) {
+          await vaultMgr.write(taskPath, task);
+        }
+      }
+
+      if (resetCount > 0 || healedCount > 0) {
+        console.log(
+          `[task-healer] Sweep complete. Reset ${resetCount} stuck tasks, bound ${healedCount} unassigned tasks.`,
+        );
+      }
+    } catch (err) {
+      console.error("[task-healer] Failed to sweep stuck tasks:", err);
+    }
   }
 
   private async runProviderHealthSync(): Promise<void> {
