@@ -136,13 +136,21 @@ ${new Date().toISOString()}
     return this.systemPrompt;
   }
 
+  private inferWorkerType(task: TaskEntry): string {
+    const combined = `${task.title} ${task.description}`.toLowerCase();
+    if (combined.includes("test") || combined.includes("validate")) return "tester";
+    if (combined.includes("build") || combined.includes("compile")) return "builder";
+    if (combined.includes("report") || combined.includes("write") || combined.includes("document")) return "reporter";
+    if (combined.includes("analyze") || combined.includes("research") || combined.includes("find")) return "analyzer";
+    return "coder";
+  }
+
   async spawn(subtask: TaskEntry): Promise<ManagerAgent | null> {
     if (subtask.tier !== 3) {
       return null;
     }
 
-    const workerTypes = ["analyzer", "coder", "reporter", "builder", "tester"] as const;
-    const workerType = workerTypes[Math.floor(Math.random() * workerTypes.length)];
+    const workerType = this.inferWorkerType(subtask);
     const workerId = `skynet-${workerType}-${Date.now()}`;
 
     const workerState: AgentState = {
