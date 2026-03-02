@@ -1009,41 +1009,39 @@ export async function runEmbeddedPiAgent(
               continue;
             }
 
-            if (fallbackConfigured) {
-              // Prefer formatted error message (user-friendly) over raw errorMessage
-              const message =
-                (lastAssistant
-                  ? formatAssistantErrorText(lastAssistant, {
-                      cfg: params.config,
-                      sessionKey: params.sessionKey ?? params.sessionId,
-                      provider: activeErrorContext.provider,
-                      model: activeErrorContext.model,
-                    })
-                  : undefined) ||
-                lastAssistant?.errorMessage?.trim() ||
-                (timedOut
-                  ? "LLM request timed out."
-                  : rateLimitFailure
-                    ? "LLM request rate limited."
-                    : billingFailure
-                      ? formatBillingErrorMessage(
-                          activeErrorContext.provider,
-                          activeErrorContext.model,
-                        )
-                      : authFailure
-                        ? "LLM request unauthorized."
-                        : "LLM request failed.");
-              const status =
-                resolveFailoverStatus(assistantFailoverReason ?? "unknown") ??
-                (isTimeoutErrorMessage(message) ? 408 : undefined);
-              throw new FailoverError(message, {
-                reason: assistantFailoverReason ?? "unknown",
-                provider: activeErrorContext.provider,
-                model: activeErrorContext.model,
-                profileId: lastProfileId,
-                status,
-              });
-            }
+            // Prefer formatted error message (user-friendly) over raw errorMessage
+            const message =
+              (lastAssistant
+                ? formatAssistantErrorText(lastAssistant, {
+                    cfg: params.config,
+                    sessionKey: params.sessionKey ?? params.sessionId,
+                    provider: activeErrorContext.provider,
+                    model: activeErrorContext.model,
+                  })
+                : undefined) ||
+              lastAssistant?.errorMessage?.trim() ||
+              (timedOut
+                ? "LLM request timed out."
+                : rateLimitFailure
+                  ? "LLM request rate limited."
+                  : billingFailure
+                    ? formatBillingErrorMessage(
+                        activeErrorContext.provider,
+                        activeErrorContext.model,
+                      )
+                    : authFailure
+                      ? "LLM request unauthorized."
+                      : "LLM request failed.");
+            const status =
+              resolveFailoverStatus(assistantFailoverReason ?? "unknown") ??
+              (isTimeoutErrorMessage(message) ? 408 : undefined);
+            throw new FailoverError(message, {
+              reason: assistantFailoverReason ?? "unknown",
+              provider: activeErrorContext.provider,
+              model: activeErrorContext.model,
+              profileId: lastProfileId,
+              status,
+            });
           }
 
           const usage = toNormalizedUsage(usageAccumulator);

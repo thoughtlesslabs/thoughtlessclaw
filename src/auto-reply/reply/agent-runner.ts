@@ -673,7 +673,8 @@ export async function runReplyAgent(params: {
       }
 
       // Final Penalty Check
-      if (!calledGovernance && !calledPing) {
+      const hadSystemError = replyPayloads.some((p) => p.isError) || runResult.meta?.error;
+      if (!calledGovernance && !calledPing && !hadSystemError) {
         defaultRuntime.error?.(
           `Nervous System: agent ${sessionKey} failed to call governance or ping, and triggered no physical physical hooks. Penalizing.`,
         );
