@@ -519,14 +519,15 @@ The Interceptor will catch your trigger line and handle everything automatically
                   agentDir: `${workerWorkspace}/agent`,
                 },
                 {
-                  agentSessionKey: "agent:main",
-                  requesterAgentIdOverride: `manager:${projectName}`,
+                  agentSessionKey: `agent:manager-${projectName}:main`,
                 },
               );
 
               if (spawnResult.status === "accepted" && spawnResult.childSessionKey) {
                 workerState.sessionId = spawnResult.childSessionKey;
                 await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
+              } else {
+                throw new Error(`Worker spawn rejected by Gateway: ${spawnResult.status}`);
               }
             } catch (err) {
               const errorMessage = err instanceof Error ? err.message : String(err);
