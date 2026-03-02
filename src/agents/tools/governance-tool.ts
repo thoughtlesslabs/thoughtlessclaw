@@ -129,6 +129,7 @@ const GovernanceConsultSchema = Type.Object({
     Type.Literal("request-permission"),
     Type.Literal("check-in"),
     Type.Literal("health-summary"),
+    Type.Literal("ask-executive"),
   ]),
   request: Type.Optional(Type.String()),
   plan: Type.Optional(Type.String()),
@@ -710,7 +711,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 createdAt: number;
                 updatedAt: number;
                 metadata: Record<string, unknown>;
-              }>(taskPath);
+              }>(`tasks/${taskPath}`);
               if (
                 task &&
                 task.status === "pending" &&
@@ -761,6 +762,44 @@ The Interceptor will catch your trigger line and handle everything automatically
               success: true,
               type: "check-in-sent",
               directive: "[NERVOUS_SYSTEM] Check-in delivered to Main Executive.",
+            });
+          }
+
+          case "ask-executive": {
+            const question = params.question as string | undefined;
+            const msg = params.message as string | undefined;
+            const proposedSolution = params.proposedSolution as string | undefined;
+            const projName = params.projectName as string | undefined;
+
+            const text = question || msg;
+            if (!text) {
+              return jsonResult({ success: false, error: "question or message required" });
+            }
+
+            const evtId = `escalate-${Date.now()}`;
+            const evt = {
+              id: evtId,
+              path: `events/${evtId}.json`,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              metadata: { projectName: projName, proposedSolution },
+              type: "event",
+              eventType: "manager-escalation",
+              eventData: JSON.stringify({ message: text, proposedSolution, projectName: projName }),
+              recipient: "main",
+              timestamp: Date.now(),
+              status: "pending",
+              sender: projName ? `manager-${projName}` : "system",
+            };
+            await vault.write(`events/${evtId}.json`, evt);
+
+            try {
+              requestHeartbeatNow({ reason: "manager-escalation", agentId: "main" });
+            } catch {}
+
+            return jsonResult({
+              success: true,
+              directive: "[NERVOUS_SYSTEM] Escalation delivered to Main Executive.",
             });
           }
 
@@ -1251,7 +1290,10 @@ The Interceptor will catch your trigger line and handle everything automatically
               if (!t.endsWith(".json")) {
                 continue;
               }
-              const task = (await vault.read(t)) as unknown as Record<string, unknown> | null;
+              const task = (await vault.read(`tasks/${t}`)) as unknown as Record<
+                string,
+                unknown
+              > | null;
               if (!task) {
                 continue;
               }
@@ -1344,6 +1386,22 @@ The Interceptor will catch your trigger line and handle everything automatically
 
               manager.activeWorkers = [...((manager.activeWorkers as string[]) || []), task.id];
               started.push(`${task.id}:${workerType}`);
+
+              // Immediately wake a subagent to begin processing this task
+              const workerPrompt = `# You are a ${WORKER_CONFIGS[workerType as keyof typeof WORKER_CONFIGS]?.description || workerType}\n\nTask: ${task.description}\n\nComplete this task and report back using \`governance(complete-task)\`.`;
+              const { callGateway } = await import("../../gateway/call.js");
+              callGateway({
+                method: "agent",
+                params: {
+                  sessionKey: `worker:${workerId}`,
+                  message: workerPrompt,
+                  idempotencyKey: `spawn-${workerId}`,
+                  label: `Worker: ${workerType}`,
+                  workspaceDir: `projects/${projectName}/workers/${workerId}`,
+                  spawnedBy: manager.id,
+                },
+                timeoutMs: 0, // don't block tool execution
+              }).catch((err) => console.error("[activate-manager] Worker spawn failed:", err));
             }
 
             manager.lastCheckIn = Date.now();
@@ -1389,7 +1447,10 @@ The Interceptor will catch your trigger line and handle everything automatically
               if (!t.endsWith(".json")) {
                 continue;
               }
-              const task = (await vault.read(t)) as unknown as Record<string, unknown> | null;
+              const task = (await vault.read(`tasks/${t}`)) as unknown as Record<
+                string,
+                unknown
+              > | null;
               if (!task) {
                 continue;
               }

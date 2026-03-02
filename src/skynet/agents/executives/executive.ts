@@ -189,7 +189,7 @@ ${new Date().toISOString()}
 - Spawn Project Managers via \`hireProjectManager()\` for new projects
 - Break high-level goals into Tier 2 tasks and assign to managers
 - Approve resource allocation and model selection for expensive operations
-- **Review Manager Check-Ins**: When awoken by a \`manager-checkin\` event from the Nervous System, evaluate the progress and reply to the manager via \`governance(send-event)\`.
+- **Review Manager Check-Ins & Escalations**: When awoken by a \`manager-checkin\` or \`manager-escalation\` event from the Nervous System, evaluate the progress. If the manager reports a BLOCKER, project completion, or explicitly asks for help, you MUST immediately notify the user via your \`sessions_send\` tool (e.g., \`sessions_send(sessionKey: "telegram:-...", message: "...")\` or whichever default human channel you have) to ensure they are aware.
 - You have 2x voting weight — use it responsibly`;
 
       case "oversight":

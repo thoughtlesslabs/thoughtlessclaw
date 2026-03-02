@@ -115,12 +115,24 @@ export function validateAnthropicTurns(messages: AgentMessage[]): AgentMessage[]
 
     // Some message types like BashExecutionMessage don't have content arrays natively in the core union
     const msgWithContent = msg as Extract<AgentMessage, { content?: unknown }>;
+
+    // If the content is a raw string and it is empty, replace it with placeholder
+    if (typeof msgWithContent.content === "string") {
+      if (msgWithContent.content.trim() === "") {
+        return { ...msg, content: "(empty)" } as unknown as AgentMessage;
+      }
+      return msg;
+    }
+
     if (!Array.isArray(msgWithContent.content)) {
       return msg;
     }
 
     const filteredContent = msgWithContent.content.filter((block: unknown) => {
       if (!block || typeof block !== "object") {
+        if (typeof block === "string" && block.trim() === "") {
+          return false;
+        }
         return true;
       }
       const rec = block as { type?: unknown; text?: unknown };
@@ -133,6 +145,9 @@ export function validateAnthropicTurns(messages: AgentMessage[]): AgentMessage[]
     // If we filtered out all blocks, keep at least one placeholder so the message isn't empty
     // (though in practice it should have an image or we'd just drop the message entirely).
     if (filteredContent.length === 0 && msgWithContent.content.length > 0) {
+      filteredContent.push({ type: "text", text: "(empty)" });
+    } else if (filteredContent.length === 0 && msgWithContent.content.length === 0) {
+      // Catch empty arrays that were already empty
       filteredContent.push({ type: "text", text: "(empty)" });
     }
 
