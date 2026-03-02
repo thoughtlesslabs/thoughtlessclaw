@@ -6,6 +6,20 @@ import type {
   ModelProviderConfig,
 } from "../config/types.models.js";
 
+function extractAgentDefaultModelPrimary(model: unknown): string | undefined {
+  if (!model) {
+    return undefined;
+  }
+  if (typeof model === "string") {
+    return model;
+  }
+  if (typeof model === "object" && "primary" in model) {
+    const primary = (model as { primary?: unknown }).primary;
+    return typeof primary === "string" ? primary : undefined;
+  }
+  return undefined;
+}
+
 function extractAgentDefaultModelFallbacks(model: unknown): string[] | undefined {
   if (!model || typeof model !== "object") {
     return undefined;
@@ -40,11 +54,18 @@ export function applyOnboardAuthAgentModelsAndProviders(
   };
 }
 
-export function applyAgentDefaultModelPrimary(
-  cfg: SkynetConfig,
-  primary: string,
-): SkynetConfig {
-  const existingFallbacks = extractAgentDefaultModelFallbacks(cfg.agents?.defaults?.model);
+export function applyAgentDefaultModelPrimary(cfg: SkynetConfig, primary: string): SkynetConfig {
+  const existingPrimary = extractAgentDefaultModelPrimary(cfg.agents?.defaults?.model);
+  const existingFallbacks = extractAgentDefaultModelFallbacks(cfg.agents?.defaults?.model) ?? [];
+
+  // Remove the new primary from fallbacks if it's already there
+  let nextFallbacks = existingFallbacks.filter((m) => m !== primary);
+
+  // If there was an old primary, and it's not the new primary, push it to the top of fallbacks
+  if (existingPrimary && existingPrimary !== primary) {
+    nextFallbacks = [existingPrimary, ...nextFallbacks.filter((m) => m !== existingPrimary)];
+  }
+
   return {
     ...cfg,
     agents: {
@@ -52,8 +73,38 @@ export function applyAgentDefaultModelPrimary(
       defaults: {
         ...cfg.agents?.defaults,
         model: {
-          ...(existingFallbacks ? { fallbacks: existingFallbacks } : undefined),
+          ...(nextFallbacks.length > 0 ? { fallbacks: nextFallbacks } : undefined),
           primary,
+        },
+      },
+    },
+  };
+}
+
+export function applyAgentDefaultModelFallback(cfg: SkynetConfig, fallback: string): SkynetConfig {
+  const existingPrimary = extractAgentDefaultModelPrimary(cfg.agents?.defaults?.model);
+  const existingFallbacks = extractAgentDefaultModelFallbacks(cfg.agents?.defaults?.model) ?? [];
+
+  let nextPrimary = existingPrimary;
+  let nextFallbacks = [...existingFallbacks];
+
+  if (!nextPrimary) {
+    // If there is no primary at all, this becomes the primary
+    nextPrimary = fallback;
+  } else if (nextPrimary !== fallback && !nextFallbacks.includes(fallback)) {
+    // Otherwise, append to fallbacks if not already present
+    nextFallbacks.push(fallback);
+  }
+
+  return {
+    ...cfg,
+    agents: {
+      ...cfg.agents,
+      defaults: {
+        ...cfg.agents?.defaults,
+        model: {
+          ...(nextFallbacks.length > 0 ? { fallbacks: nextFallbacks } : undefined),
+          ...(nextPrimary ? { primary: nextPrimary } : {}),
         },
       },
     },

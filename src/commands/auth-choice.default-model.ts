@@ -1,6 +1,7 @@
 import type { SkynetConfig } from "../config/config.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { ensureModelAllowlistEntry } from "./model-allowlist.js";
+import { applyAgentDefaultModelFallback } from "./onboard-auth.js";
 
 export async function applyDefaultModelChoice(params: {
   config: SkynetConfig;
@@ -21,8 +22,9 @@ export async function applyDefaultModelChoice(params: {
   }
 
   const next = params.applyProviderConfig(params.config);
+  const nextWithFallback = applyAgentDefaultModelFallback(next, params.defaultModel);
   const nextWithModel = ensureModelAllowlistEntry({
-    cfg: next,
+    cfg: nextWithFallback,
     modelRef: params.defaultModel,
   });
   await params.noteAgentModel(params.defaultModel);

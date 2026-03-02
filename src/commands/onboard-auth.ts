@@ -4,6 +4,7 @@ export {
 } from "../agents/synthetic-models.js";
 export { VENICE_DEFAULT_MODEL_ID, VENICE_DEFAULT_MODEL_REF } from "../agents/venice-models.js";
 export {
+  applyAgentDefaultModelFallback,
   applyAuthProfileConfig,
   applyCloudflareAiGatewayConfig,
   applyCloudflareAiGatewayProviderConfig,

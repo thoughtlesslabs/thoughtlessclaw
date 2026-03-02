@@ -54,12 +54,15 @@ export {
   LITELLM_DEFAULT_MODEL_ID,
 } from "./onboard-auth.config-litellm.js";
 import {
+  applyAgentDefaultModelFallback,
   applyAgentDefaultModelPrimary,
   applyOnboardAuthAgentModelsAndProviders,
   applyProviderConfigWithDefaultModel,
   applyProviderConfigWithDefaultModels,
   applyProviderConfigWithModelCatalog,
 } from "./onboard-auth.config-shared.js";
+
+export { applyAgentDefaultModelFallback };
 import {
   buildMistralModelDefinition,
   buildZaiModelDefinition,
@@ -179,10 +182,7 @@ export function applyMoonshotProviderConfigCn(cfg: SkynetConfig): SkynetConfig {
   return applyMoonshotProviderConfigWithBaseUrl(cfg, MOONSHOT_CN_BASE_URL);
 }
 
-function applyMoonshotProviderConfigWithBaseUrl(
-  cfg: SkynetConfig,
-  baseUrl: string,
-): SkynetConfig {
+function applyMoonshotProviderConfigWithBaseUrl(cfg: SkynetConfig, baseUrl: string): SkynetConfig {
   const models = { ...cfg.agents?.defaults?.models };
   models[MOONSHOT_DEFAULT_MODEL_REF] = {
     ...models[MOONSHOT_DEFAULT_MODEL_REF],

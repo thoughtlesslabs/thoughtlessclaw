@@ -283,6 +283,65 @@ export const _probeThrottleInternals = {
   resolveProbeThrottleKey,
 } as const;
 
+// --- HIERARCHICAL CONCURRENCY LIMITS ---
+// Prevents "thundering herd" on fallback models by distributing load across the fallback chain
+
+const activeModelCalls = new Map<string, number>();
+
+function getActiveModelCalls(provider: string, model: string): number {
+  return activeModelCalls.get(`${provider}::${model}`) ?? 0;
+}
+
+function incrementActiveModelCalls(provider: string, model: string): void {
+  const key = `${provider}::${model}`;
+  activeModelCalls.set(key, (activeModelCalls.get(key) ?? 0) + 1);
+}
+
+function decrementActiveModelCalls(provider: string, model: string): void {
+  const key = `${provider}::${model}`;
+  const current = activeModelCalls.get(key) ?? 0;
+  if (current <= 1) {
+    activeModelCalls.delete(key);
+  } else {
+    activeModelCalls.set(key, current - 1);
+  }
+}
+
+function resolveAgentTier(agentDir?: string): number {
+  if (!agentDir) {
+    return 3; // Default to Tier 3 (worker-level) if unknown
+  }
+  // Tier 1: Main, Oversight, Monitor, Optimizer
+  if (
+    agentDir.includes("/agents/main") ||
+    agentDir.includes("/agents/oversight") ||
+    agentDir.includes("/agents/monitor") ||
+    agentDir.includes("/agents/optimizer")
+  ) {
+    return 1;
+  }
+  // Tier 2: Project Managers
+  if (agentDir.includes("/agents/manager-")) {
+    return 2;
+  }
+  // Tier 3: Workers / Everything Else
+  return 3;
+}
+
+function isModelSaturated(provider: string, model: string, agentDir?: string): boolean {
+  const active = getActiveModelCalls(provider, model);
+  const tier = resolveAgentTier(agentDir);
+
+  if (tier === 1) {
+    // Executives share generously (>= 3 concurrent)
+    return active >= 3;
+  }
+
+  // Managers and Workers are strictly 1-at-a-time per model.
+  // If ANYONE else is using this model, consider it saturated so we gracefully try the next fallback.
+  return active >= 1;
+}
+
 export async function runWithModelFallback<T>(params: {
   cfg: SkynetConfig | undefined;
   provider: string;
@@ -369,7 +428,21 @@ export async function runWithModelFallback<T>(params: {
         lastProbeAttempt.set(probeThrottleKey, now);
       }
     }
+
+    if (hasFallbackCandidates) {
+      if (isModelSaturated(candidate.provider, candidate.model, params.agentDir)) {
+        attempts.push({
+          provider: candidate.provider,
+          model: candidate.model,
+          error: `Concurrency limit reached for Tier ${resolveAgentTier(params.agentDir)}.`,
+          reason: "rate_limit",
+        });
+        continue;
+      }
+    }
+
     try {
+      incrementActiveModelCalls(candidate.provider, candidate.model);
       const result = await params.run(candidate.provider, candidate.model);
       if (i > 0) {
         // Record successful fallback to accelerate future failovers
@@ -422,6 +495,8 @@ export async function runWithModelFallback<T>(params: {
         attempt: i + 1,
         total: candidates.length,
       });
+    } finally {
+      decrementActiveModelCalls(candidate.provider, candidate.model);
     }
   }
 
@@ -459,7 +534,21 @@ export async function runWithImageModelFallback<T>(params: {
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates[i];
+
+    if (candidates.length > 1) {
+      if (isModelSaturated(candidate.provider, candidate.model, undefined)) {
+        attempts.push({
+          provider: candidate.provider,
+          model: candidate.model,
+          error: `Concurrency limit reached for image fallback.`,
+          reason: "rate_limit",
+        });
+        continue;
+      }
+    }
+
     try {
+      incrementActiveModelCalls(candidate.provider, candidate.model);
       const result = await params.run(candidate.provider, candidate.model);
       return {
         result,
@@ -484,6 +573,8 @@ export async function runWithImageModelFallback<T>(params: {
         attempt: i + 1,
         total: candidates.length,
       });
+    } finally {
+      decrementActiveModelCalls(candidate.provider, candidate.model);
     }
   }
 
