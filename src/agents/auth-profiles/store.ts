@@ -153,8 +153,9 @@ function mergeAuthProfileStores(
     version: Math.max(base.version, override.version ?? base.version),
     profiles: { ...base.profiles, ...override.profiles },
     order: mergeRecord(base.order, override.order),
-    lastGood: mergeRecord(base.lastGood, override.lastGood),
-    usageStats: mergeRecord(base.usageStats, override.usageStats),
+    // Isolate runtime state so cooldowns and usage stats don't synchronize fleet-wide
+    lastGood: override.lastGood,
+    usageStats: override.usageStats,
   };
 }
 

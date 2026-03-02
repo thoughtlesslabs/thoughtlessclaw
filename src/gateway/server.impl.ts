@@ -278,22 +278,25 @@ export async function startGatewayServer(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let skynetSystem: any = null;
   if (!minimalTestGateway) {
-    try {
-      const { createSkynet } = await import("../skynet/index.js");
-      skynetSystem = createSkynet({ vaultPath: "~/.skynet/vault" });
-      await skynetSystem.initialize();
-      log.info("[Skynet] Governance system initialized: executives + system manager ready");
+    // Start governance initialization asynchronously so it doesn't block gateway boot if vault locks hang
+    void (async () => {
+      try {
+        const { createSkynet } = await import("../skynet/index.js");
+        skynetSystem = createSkynet({ vaultPath: "~/.skynet/vault" });
+        await skynetSystem.initialize();
+        log.info("[Skynet] Governance system initialized: executives + system manager ready");
 
-      // Manager sessions are started by the tick handler - no need for separate startup logic
+        // Manager sessions are started by the tick handler - no need for separate startup logic
 
-      const { getTickHandler } = await import("../skynet/proactive/tick-handler.js");
-      const tickHandler = getTickHandler();
-      await tickHandler.initialize();
-      tickHandler.start(60000);
-      log.info("[Skynet] Proactive tick handlers started");
-    } catch (err) {
-      log.warn(`Skynet governance system failed to initialize: ${String(err)}`);
-    }
+        const { getTickHandler } = await import("../skynet/proactive/tick-handler.js");
+        const tickHandler = getTickHandler();
+        await tickHandler.initialize();
+        tickHandler.start(60000);
+        log.info("[Skynet] Proactive tick handlers started");
+      } catch (err) {
+        log.warn(`Skynet governance system failed to initialize: ${String(err)}`);
+      }
+    })();
   }
 
   const defaultAgentId = resolveDefaultAgentId(cfgAtStart);

@@ -127,7 +127,7 @@ export async function deliverReplies(params: {
       let sentTextChunk = false;
       for (let i = 0; i < chunks.length; i += 1) {
         const chunk = chunks[i];
-        if (!chunk) {
+        if (!chunk || typeof chunk.text !== "string" || !chunk.text.trim()) {
           continue;
         }
         // Only attach buttons to the first chunk.

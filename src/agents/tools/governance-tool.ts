@@ -469,7 +469,7 @@ ${
               lastSleep: 0,
               currentTaskId: taskId,
               rewardPoints: 100,
-              violations: [],
+              violations: [] as string[],
               capabilities: [workerType],
               sessionId: null as string | null,
             };
@@ -518,17 +518,33 @@ The Interceptor will catch your trigger line and handle everything automatically
                   workspaceDir: workerWorkspace,
                   agentDir: `${workerWorkspace}/agent`,
                 },
-                { agentSessionKey: "agent:main", requesterAgentIdOverride: "main" },
+                {
+                  agentSessionKey: "agent:main",
+                  requesterAgentIdOverride: `manager:${projectName}`,
+                },
               );
 
               if (spawnResult.status === "accepted" && spawnResult.childSessionKey) {
                 workerState.sessionId = spawnResult.childSessionKey;
                 await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
               }
-            } catch {
-              console.log("Failed to spawn worker subagent");
-            }
+            } catch (err) {
+              const errorMessage = err instanceof Error ? err.message : String(err);
+              console.error(
+                `Failed to spawn worker subagent [${workerType}] for project ${projectName}:`,
+                errorMessage,
+              );
 
+              // Mark worker state as crashed so it doesn't stay 'awake' indefinitely without a session
+              (workerState as Record<string, unknown>).status = "fault";
+              workerState.violations.push(`Failed to spawn session: ${errorMessage}`);
+              await vault.write(`projects/${projectName}/workers/${workerId}.json`, workerState);
+
+              return jsonResult({
+                success: false,
+                error: `Failed to spawn worker subagent: ${errorMessage}`,
+              });
+            }
             return jsonResult({
               success: true,
               type: "worker-spawned",

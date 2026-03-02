@@ -22,6 +22,7 @@ export interface TaskHealth {
 // For fallback (tick handler when manager is dead), default to content
 
 let tickHandlerRegistryInstance: TickHandlerRegistry | null = null;
+const alertedExpiries = new Set<string>();
 
 export function getTickHandlerRegistry(): TickHandlerRegistry | null {
   return tickHandlerRegistryInstance;
@@ -99,6 +100,7 @@ export class TickHandlerRegistry {
       const { resolveAuthStorePath } = await import("../../agents/auth-profiles/paths.js");
       const { loadAuthProfileStore } = await import("../../agents/auth-profiles/store.js");
       const { resolveUserPath } = await import("../../utils.js");
+      const { enqueueSystemEvent } = await import("../../infra/system-events.js");
       const fs = await import("node:fs/promises");
       const path = await import("node:path");
 
@@ -107,7 +109,11 @@ export class TickHandlerRegistry {
 
       const healthData: Record<
         string,
-        { provider: string; model?: string; status: "healthy" | "cooldown" | "half-open" }
+        {
+          provider: string;
+          model?: string;
+          status: "healthy" | "cooldown" | "half-open" | "expired";
+        }
       > = {};
 
       const now = Date.now();
@@ -118,14 +124,30 @@ export class TickHandlerRegistry {
           return;
         }
 
-        let status: "healthy" | "cooldown" | "half-open" = "healthy";
+        let status: "healthy" | "cooldown" | "half-open" | "expired" = "healthy";
 
-        if (stats.halfOpenActive) {
-          status = "half-open";
-        } else if (stats.disabledUntil && stats.disabledUntil > now) {
-          status = "cooldown";
-        } else if (stats.cooldownUntil && stats.cooldownUntil > now) {
-          status = "cooldown";
+        if (credential.type === "oauth" && typeof credential.expires === "number") {
+          if (now >= credential.expires) {
+            status = "expired";
+          } else if (credential.expires - now < 3 * 24 * 60 * 60 * 1000) {
+            if (!alertedExpiries.has(profileId)) {
+              alertedExpiries.add(profileId);
+              enqueueSystemEvent(
+                `[System Warning] OAuth Token for ${profileId} (${credential.provider}) is expiring soon (in less than 3 days). Please re-authenticate to prevent disruption.`,
+                { contextKey: "OAuth Expiry" },
+              ).catch(() => {});
+            }
+          }
+        }
+
+        if (status !== "expired") {
+          if (stats.halfOpenActive) {
+            status = "half-open";
+          } else if (stats.disabledUntil && stats.disabledUntil > now) {
+            status = "cooldown";
+          } else if (stats.cooldownUntil && stats.cooldownUntil > now) {
+            status = "cooldown";
+          }
         }
 
         healthData[profileId] = {
@@ -151,8 +173,48 @@ export class TickHandlerRegistry {
       const vault = await this.getVault();
       const vaultMgr = vault as import("../vault/manager.js").VaultManager;
 
-      const DORMANT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+      // Option C: Governance-Light Mode
+      // Only wake dormant executives/managers once per hour to save LLM calls.
+      const DORMANT_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
       const now = Date.now();
+
+      // --- Option C: Smart Dormant Check ---
+      // Instead of universally waking every dormant agent and consuming LLM calls
+      // constantly, scan the global event & task state first.
+      const eventFiles = await vaultMgr.list(`events/`);
+      const taskFiles = await vaultMgr.list(`tasks/`);
+      let hasPendingWork = false;
+
+      for (const ef of eventFiles) {
+        if (!ef.endsWith(".json")) {
+          continue;
+        }
+        const ev = await vaultMgr.read(`events/${ef}`);
+        if (ev && ev.status === "pending") {
+          hasPendingWork = true;
+          break;
+        }
+      }
+
+      if (!hasPendingWork) {
+        for (const tf of taskFiles) {
+          if (!tf.endsWith(".json")) {
+            continue;
+          }
+          const tsk = await vaultMgr.read(`tasks/${tf}`);
+          if (tsk && tsk.status === "pending") {
+            hasPendingWork = true;
+            break;
+          }
+        }
+      }
+
+      if (!hasPendingWork) {
+        console.log(
+          "[dormant-check] All events and tasks are cleared. Skipping dormant wakes to save LLM calls.",
+        );
+        return;
+      }
 
       // Check executives
       const executives = ["main", "oversight", "monitor", "optimizer"];
@@ -261,35 +323,56 @@ export class TickHandlerRegistry {
     }
   }
 
+  private activeTimers: Map<string, NodeJS.Timeout> = new Map();
+
   start(intervalMs: number): void {
     if (this.tickInterval) {
       return;
     }
+    // We set this to true just to act as a flag that it is started
+    this.tickInterval = setTimeout(() => {}, 0);
 
     // Run immediately on startup to start dormant managers
     console.log("[TickHandler] Running initial tick to start managers...");
+
+    const scheduleNext = (name: string, handler: TickHandler, overrideInterval?: number) => {
+      const wait = overrideInterval ?? handler.intervalMs ?? intervalMs;
+      const timer = setTimeout(async () => {
+        if (!handler.enabled) {
+          scheduleNext(name, handler);
+          return;
+        }
+        try {
+          await handler.run();
+        } catch (err) {
+          console.error(`[TickHandler] ${name} failed:`, err);
+        } finally {
+          scheduleNext(name, handler);
+        }
+      }, wait);
+      this.activeTimers.set(name, timer);
+    };
+
     for (const [name, handler] of this.handlers) {
       if (handler.enabled) {
-        handler.run().catch((err) => console.error(`[TickHandler] Initial ${name} failed:`, err));
+        handler
+          .run()
+          .catch((err) => console.error(`[TickHandler] Initial ${name} failed:`, err))
+          .finally(() => scheduleNext(name, handler));
+      } else {
+        scheduleNext(name, handler);
       }
     }
-
-    this.tickInterval = setInterval(async () => {
-      for (const [name, handler] of this.handlers) {
-        if (handler.enabled) {
-          try {
-            await handler.run();
-          } catch (err) {
-            console.error(`[TickHandler] ${name} failed:`, err);
-          }
-        }
-      }
-    }, intervalMs);
   }
 
   stop(): void {
+    for (const timer of this.activeTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.activeTimers.clear();
+
     if (this.tickInterval) {
-      clearInterval(this.tickInterval);
+      clearTimeout(this.tickInterval);
       this.tickInterval = null;
     }
   }

@@ -508,6 +508,7 @@ async function sendAnnounce(item: AnnounceQueueItem) {
       threadId: requesterIsSubagent ? undefined : threadId,
       deliver: !requesterIsSubagent,
       idempotencyKey,
+      inputProvenance: { kind: "inter_session" },
     },
     timeoutMs: announceTimeoutMs,
   });
@@ -766,6 +767,7 @@ async function sendSubagentAnnounceDirectly(params: {
         to: shouldDeliverExternally ? directTo : undefined,
         threadId: shouldDeliverExternally ? threadId : undefined,
         idempotencyKey: params.directIdempotencyKey,
+        inputProvenance: { kind: "inter_session" },
       },
       expectFinal: true,
       timeoutMs: announceTimeoutMs,

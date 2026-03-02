@@ -136,10 +136,7 @@ export function isHeartbeatEnabledForAgent(cfg: SkynetConfig, agentId?: string):
   return resolvedAgentId === resolveDefaultAgentId(cfg);
 }
 
-function resolveHeartbeatConfig(
-  cfg: SkynetConfig,
-  agentId?: string,
-): HeartbeatConfig | undefined {
+function resolveHeartbeatConfig(cfg: SkynetConfig, agentId?: string): HeartbeatConfig | undefined {
   const defaults = cfg.agents?.defaults?.heartbeat;
   if (!agentId) {
     return defaults;
@@ -574,11 +571,15 @@ export async function runHeartbeatOnce(opts: {
   if (!heartbeatsEnabled) {
     return { status: "skipped", reason: "disabled" };
   }
-  if (!isHeartbeatEnabledForAgent(cfg, agentId)) {
-    return { status: "skipped", reason: "disabled" };
-  }
-  if (!resolveHeartbeatIntervalMs(cfg, undefined, heartbeat)) {
-    return { status: "skipped", reason: "disabled" };
+  const isTargetedWake = opts.reason && opts.reason !== "interval";
+
+  if (!isTargetedWake) {
+    if (!isHeartbeatEnabledForAgent(cfg, agentId)) {
+      return { status: "skipped", reason: "disabled" };
+    }
+    if (!resolveHeartbeatIntervalMs(cfg, undefined, heartbeat)) {
+      return { status: "skipped", reason: "disabled" };
+    }
   }
 
   const startedAt = opts.deps?.nowMs?.() ?? Date.now();
@@ -1090,10 +1091,16 @@ export function startHeartbeatRunner(opts: {
 
     if (requestedSessionKey || requestedAgentId) {
       const targetAgentId = requestedAgentId ?? resolveAgentIdFromSessionKey(requestedSessionKey);
-      const targetAgent = state.agents.get(targetAgentId);
+      let targetAgent = state.agents.get(targetAgentId);
       if (!targetAgent) {
-        scheduleNext();
-        return { status: "skipped", reason: "disabled" };
+        // Synthesize an ad-hoc target for explicit wakes if the agent is not in the periodic heartbeat list
+        const hbConfig = resolveHeartbeatConfig(state.cfg, targetAgentId);
+        targetAgent = {
+          agentId: targetAgentId,
+          heartbeat: hbConfig,
+          intervalMs: resolveHeartbeatIntervalMs(state.cfg, undefined, hbConfig) || 0,
+          nextDueMs: now,
+        };
       }
       try {
         const res = await runOnce({
