@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { diagnosticLogger as diag, logLaneDequeue, logLaneEnqueue } from "../logging/diagnostic.js";
 import { CommandLane } from "./lanes.js";
 /**
@@ -76,10 +79,6 @@ function drainLane(lane: string) {
     // --- NERVOUS SYSTEM SURVIVAL MODE THROTTLING ---
     if (lane === (CommandLane.Subagent as string)) {
       try {
-        // We use require inside the execution path since command-queue is deep in the core
-        const fs = require("node:fs");
-        const path = require("node:path");
-        const os = require("node:os");
         const homedir = os.homedir();
         const statePath = path.join(homedir, ".skynet", "system-state.json");
         if (fs.existsSync(statePath)) {
