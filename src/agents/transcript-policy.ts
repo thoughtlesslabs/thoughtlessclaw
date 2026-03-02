@@ -54,13 +54,33 @@ function isOpenAiProvider(provider?: string | null): boolean {
   return OPENAI_PROVIDERS.has(normalizeProviderId(provider));
 }
 
-function isAnthropicApi(modelApi?: string | null, provider?: string | null): boolean {
+function isAnthropicApi(
+  modelApi?: string | null,
+  provider?: string | null,
+  modelId?: string | null,
+): boolean {
   if (modelApi === "anthropic-messages" || modelApi === "bedrock-converse-stream") {
     return true;
   }
   const normalized = normalizeProviderId(provider ?? "");
   // MiniMax now uses openai-completions API, not anthropic-messages
-  return normalized === "anthropic" || normalized === "amazon-bedrock";
+  if (normalized === "anthropic" || normalized === "amazon-bedrock") {
+    return true;
+  }
+
+  // Apply Anthropic strict validation rules when routing to Claude models via proxy
+  const lowerModelId = (modelId ?? "").toLowerCase();
+  if (
+    (normalized === "openrouter" ||
+      normalized === "opencode" ||
+      normalized === "kilocode" ||
+      normalized === "github-copilot") &&
+    (lowerModelId.includes("claude") || lowerModelId.includes("anthropic"))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function isMistralModel(params: { provider?: string | null; modelId?: string | null }): boolean {
@@ -83,7 +103,7 @@ export function resolveTranscriptPolicy(params: {
   const provider = normalizeProviderId(params.provider ?? "");
   const modelId = params.modelId ?? "";
   const isGoogle = isGoogleModelApi(params.modelApi);
-  const isAnthropic = isAnthropicApi(params.modelApi, provider);
+  const isAnthropic = isAnthropicApi(params.modelApi, provider, modelId);
   const isOpenAi = isOpenAiProvider(provider) || (!provider && isOpenAiApi(params.modelApi));
   const isStrictOpenAiCompatible =
     params.modelApi === "openai-completions" &&
