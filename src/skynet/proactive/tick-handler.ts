@@ -105,6 +105,9 @@ export class TickHandlerRegistry {
         await this.runTaskHealer();
       },
     });
+
+    const { createSurvivalMonitorHandler } = await import("./survival-monitor.js");
+    this.handlers.set("survival-monitor", createSurvivalMonitorHandler());
   }
 
   private async runTaskHealer(): Promise<void> {
@@ -261,6 +264,26 @@ export class TickHandlerRegistry {
       // --- Option C: Smart Dormant Check ---
       // Instead of universally waking every dormant agent and consuming LLM calls
       // constantly, scan the global event & task state first.
+
+      // --- NERVOUS SYSTEM SURVIVAL MODE ---
+      let isSurvival = false;
+      try {
+        const { resolveUserPath } = await import("../../utils.js");
+        const fs = await import("node:fs/promises");
+        const path = await import("node:path");
+        const statePath = path.join(resolveUserPath("~/.skynet"), "system-state.json");
+        const stateRaw = await fs.readFile(statePath, "utf-8");
+        const stateData = JSON.parse(stateRaw);
+        if (stateData.state === "SURVIVAL") {
+          isSurvival = true;
+        }
+      } catch {
+        // Assume NORMAL if file missing
+      }
+
+      // --- Option C: Smart Dormant Check ---
+      // Instead of universally waking every dormant agent and consuming LLM calls
+      // constantly, scan the global event & task state first.
       const eventFiles = await vaultMgr.list(`events/`);
       const taskFiles = await vaultMgr.list(`tasks/`);
       let hasPendingWork = false;
@@ -329,6 +352,13 @@ export class TickHandlerRegistry {
             console.error(`[dormant-check] Failed to wake executive ${exec}:`, err);
           }
         }
+      }
+
+      if (isSurvival) {
+        console.warn(
+          "[dormant-check] NERVOUS SYSTEM SURVIVAL MODE ENGAGED. Bypassing all manager and worker dormant wakes to conserve critical LLM proxy resources.",
+        );
+        return;
       }
 
       // Check managers

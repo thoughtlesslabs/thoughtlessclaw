@@ -71,7 +71,35 @@ function drainLane(lane: string) {
   state.draining = true;
 
   const pump = () => {
-    while (state.activeTaskIds.size < state.maxConcurrent && state.queue.length > 0) {
+    let effectiveMaxConcurrent = state.maxConcurrent;
+
+    // --- NERVOUS SYSTEM SURVIVAL MODE THROTTLING ---
+    if (lane === (CommandLane.Subagent as string)) {
+      try {
+        // We use require inside the execution path since command-queue is deep in the core
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const os = require("node:os");
+        const homedir = os.homedir();
+        const statePath = path.join(homedir, ".skynet", "system-state.json");
+        if (fs.existsSync(statePath)) {
+          const stateRaw = fs.readFileSync(statePath, "utf-8");
+          const stateData = JSON.parse(stateRaw);
+          if (stateData.state === "SURVIVAL") {
+            // Hard stop for subagents. Queue fills but does not process.
+            effectiveMaxConcurrent = 0;
+            diag.warn(
+              `[NERVOUS_SYSTEM] SURVIVAL MODE: Throttling Subagent lane concurrency to 0. Freezing queue.`,
+            );
+          }
+        }
+      } catch {
+        // Assume normal on error
+      }
+    }
+    // -----------------------------------------------
+
+    while (state.activeTaskIds.size < effectiveMaxConcurrent && state.queue.length > 0) {
       const entry = state.queue.shift() as QueueEntry;
       const waitedMs = Date.now() - entry.enqueuedAt;
       if (waitedMs >= entry.warnAfterMs) {

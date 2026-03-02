@@ -1385,36 +1385,32 @@ The Interceptor will catch your trigger line and handle everything automatically
 
             // -------------------------------------
             // Prevent Manager-Driven Rate Limit Death Spirals
-            // Do not attempt to spawn ANY workers if the core LLM supply is fully exhausted
+            // Do not attempt to spawn ANY workers if the Nervous System has engaged SURVIVAL mode
             try {
               const { resolveUserPath } = await import("../../utils.js");
               const fs = await import("node:fs/promises");
               const path = await import("node:path");
-              const healthPath = path.join(resolveUserPath("~/.skynet"), "provider-health.json");
+              const statePath = path.join(resolveUserPath("~/.skynet"), "system-state.json");
               if (
                 await fs
-                  .stat(healthPath)
+                  .stat(statePath)
                   .then(() => true)
                   .catch(() => false)
               ) {
-                const rawHealth = await fs.readFile(healthPath, "utf-8");
-                const healthData = JSON.parse(rawHealth) as Record<string, { status: string }>;
-                const hasAvailableProvider = Object.values(healthData).some(
-                  (p) => p.status === "healthy" || p.status === "half-open",
-                );
-
-                if (!hasAvailableProvider && Object.keys(healthData).length > 0) {
+                const stateRaw = await fs.readFile(statePath, "utf-8");
+                const stateData = JSON.parse(stateRaw);
+                if (stateData.state === "SURVIVAL") {
                   return jsonResult({
                     success: false,
                     error:
-                      "Provider Cooldown: All routing models are currently rate-limited. Task assignment paused.",
+                      "System is in SURVIVAL mode. All API proxies are rate-limited or exhausted.",
                     directive:
-                      "[NERVOUS_SYSTEM] Failed to claim pending tasks because all API proxies are RATE LIMITED. Yield control (hibernate) and retry later.",
+                      "[NERVOUS_SYSTEM] SURVIVAL MODE ENGAGED. Critical API Resource limit reached. Complete shutdown of lower functions. Hibernate immediately.",
                   });
                 }
               }
             } catch {
-              // Non-fatal if health file isn't ready
+              // Non-fatal if state file isn't ready
             }
             // -------------------------------------
 
@@ -1611,6 +1607,68 @@ The Interceptor will catch your trigger line and handle everything automatically
 
             const workerTypes = Object.keys(WORKER_CONFIGS);
 
+            // --- Zombie Worker Timeout Check ---
+            const workerTimeoutMs = (manager.workerTimeoutMs as number) || 600000;
+            const now = Date.now();
+            let reclaimedCount = 0;
+
+            for (const task of projectTasks) {
+              if (task.status === "in_progress") {
+                const fullTask = (await vault.read(`tasks/${task.path}`)) as unknown as Record<
+                  string,
+                  unknown
+                > | null;
+                if (!fullTask) {
+                  continue;
+                }
+
+                const lastUpdated =
+                  (fullTask.updatedAt as number) || (fullTask.createdAt as number) || 0;
+
+                // If it has been sitting in_progress longer than the timeout without an update...
+                if (now - lastUpdated > workerTimeoutMs) {
+                  // Revert it to pending so a new worker can be spawned
+                  fullTask.status = "pending";
+                  fullTask.updatedAt = now;
+
+                  // Keep a log in metadata of the abandonment
+                  if (!fullTask.metadata || typeof fullTask.metadata !== "object") {
+                    fullTask.metadata = {};
+                  }
+                  const meta = fullTask.metadata as Record<string, unknown>;
+
+                  const prevAssignee =
+                    typeof fullTask.assignee === "string" ? fullTask.assignee : "unknown";
+                  meta.lastAbandonedBy = prevAssignee;
+                  meta.abandonedAt = now;
+
+                  // Restore original target assignee to the manager's domain
+                  fullTask.assignee =
+                    projectName === "system" ? "manager-system" : `manager-${projectName}`;
+
+                  await vault.write(
+                    `tasks/${task.path}`,
+                    fullTask as unknown as Parameters<typeof vault.write>[1],
+                  );
+
+                  // Clean up the dead worker state record
+                  if (prevAssignee && prevAssignee.startsWith("worker-")) {
+                    const existingWorkerPath = `projects/${projectName}/workers/${prevAssignee}.json`;
+                    await vault.delete(existingWorkerPath).catch(() => {});
+                  }
+
+                  // Adjust our local copies so we don't try to sync the dead worker
+                  task.status = "pending";
+                  const idx = activeWorkers.indexOf(task.id);
+                  if (idx !== -1) {
+                    activeWorkers.splice(idx, 1);
+                  }
+                  reclaimedCount++;
+                }
+              }
+            }
+            // -----------------------------------
+
             for (const task of projectTasks) {
               if (task.status === "in_progress" && task.assignee) {
                 const workerId = task.assignee;
@@ -1679,6 +1737,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               tasksFound: projectTasks.length,
               activeWorkers: activeWorkers.length,
               workersSynced: syncedWorkers.length,
+              tasksReclaimed: reclaimedCount,
               config: {
                 autoSpawn: manager.autoSpawn,
                 maxConcurrentWorkers: manager.maxConcurrentWorkers,
@@ -1750,6 +1809,37 @@ The Interceptor will catch your trigger line and handle everything automatically
             if (!config) {
               return jsonResult({ success: false, error: `Unknown worker type: ${workerType}` });
             }
+
+            // -------------------------------------
+            // Prevent Manager-Driven Rate Limit Death Spirals
+            // Do not attempt to spawn ANY workers if the Nervous System has engaged SURVIVAL mode
+            try {
+              const { resolveUserPath } = await import("../../utils.js");
+              const fs = await import("node:fs/promises");
+              const path = await import("node:path");
+              const statePath = path.join(resolveUserPath("~/.skynet"), "system-state.json");
+              if (
+                await fs
+                  .stat(statePath)
+                  .then(() => true)
+                  .catch(() => false)
+              ) {
+                const stateRaw = await fs.readFile(statePath, "utf-8");
+                const stateData = JSON.parse(stateRaw);
+                if (stateData.state === "SURVIVAL") {
+                  return jsonResult({
+                    success: false,
+                    error:
+                      "System is in SURVIVAL mode. All API proxies are rate-limited or exhausted.",
+                    directive:
+                      "[NERVOUS_SYSTEM] SURVIVAL MODE ENGAGED. Critical API Resource limit reached. Complete shutdown of lower functions. Hibernate immediately.",
+                  });
+                }
+              }
+            } catch {
+              // Non-fatal if state file isn't ready
+            }
+            // -------------------------------------
 
             const workerId = `worker-${workerType}-${Date.now()}`;
 
