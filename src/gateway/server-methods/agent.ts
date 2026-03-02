@@ -198,6 +198,8 @@ export const agentHandlers: GatewayRequestHandlers = {
       inputProvenance?: InputProvenance;
       workspaceDir?: string;
       agentDir?: string;
+      execute?: boolean;
+      messageChannel?: string;
     };
     const cfg = loadConfig();
     const idem = request.idempotencyKey;

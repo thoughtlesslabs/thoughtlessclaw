@@ -92,6 +92,8 @@ export const AgentParamsSchema = Type.Object(
     spawnedBy: Type.Optional(Type.String()),
     workspaceDir: Type.Optional(Type.String()),
     agentDir: Type.Optional(Type.String()),
+    execute: Type.Optional(Type.Boolean()),
+    messageChannel: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
