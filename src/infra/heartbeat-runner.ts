@@ -592,6 +592,73 @@ async function resolveHeartbeatPreflight(params: {
   return basePreflight;
 }
 
+async function getSystemStatusSummary(): Promise<string> {
+  try {
+    const { createVaultManager } = await import("../skynet/vault/manager.js");
+    const { resolveUserPath } = await import("../utils.js");
+    const vault = createVaultManager(resolveUserPath("~/.skynet/vault"));
+
+    // Quick parallel listing of key directories
+    const [projectDirs, tasks, events] = await Promise.all([
+      vault.listDirs("projects/").catch(() => []),
+      vault.list("tasks/").catch(() => []),
+      vault.list("events/").catch(() => []),
+    ]);
+
+    let activeWorkers = 0;
+    // Iterate over worker directories
+    await Promise.all(
+      projectDirs.map(async (proj) => {
+        const workers = await vault.list(`projects/${proj}/workers/`).catch(() => []);
+        for (const w of workers) {
+          if (w.endsWith(".json")) {
+            const state = (await vault
+              .read(`projects/${proj}/workers/${w}`)
+              .catch(() => null)) as Record<string, unknown> | null;
+            if (state && typeof state === "object" && state.currentTaskId) {
+              activeWorkers++;
+            }
+          }
+        }
+      }),
+    );
+
+    let pendingTasks = 0;
+    for (const t of tasks) {
+      if (t.endsWith(".json")) {
+        const task = (await vault.read(`tasks/${t}`).catch(() => null)) as Record<
+          string,
+          unknown
+        > | null;
+        if (task && typeof task === "object" && task.status === "pending") {
+          pendingTasks++;
+        }
+      }
+    }
+
+    let pendingEvents = 0;
+    for (const e of events) {
+      if (e.endsWith(".json")) {
+        const event = (await vault.read(`events/${e}`).catch(() => null)) as Record<
+          string,
+          unknown
+        > | null;
+        if (event && typeof event === "object" && (!event.status || event.status === "pending")) {
+          pendingEvents++;
+        }
+      }
+    }
+
+    if (activeWorkers === 0 && pendingTasks === 0 && pendingEvents === 0) {
+      return "Current Skynet Vault Status: [IDLE - No Active Workers, No Pending Tasks, No Actionable Events]";
+    }
+
+    return `Current Skynet Vault Status: [${activeWorkers} Active Workers | ${pendingTasks} Pending Tasks | ${pendingEvents} Actionable Events Queue]`;
+  } catch {
+    return "Current Skynet Vault Status: [Unavailable]";
+  }
+}
+
 export async function runHeartbeatOnce(opts: {
   cfg?: SkynetConfig;
   agentId?: string;
@@ -690,13 +757,19 @@ export async function runHeartbeatOnce(opts: {
     .map((event) => event.text);
   const hasExecCompletion = pendingEvents.some(isExecCompletionEvent);
   const hasCronEvents = cronEvents.length > 0;
-  const prompt = hasExecCompletion
+  let promptText = hasExecCompletion
     ? EXEC_EVENT_PROMPT
     : hasCronEvents
       ? buildCronEventPrompt(cronEvents)
       : resolveHeartbeatPrompt(cfg, heartbeat);
+
+  if (["main", "oversight", "monitor", "optimizer"].includes(agentId)) {
+    const vaultSummary = await getSystemStatusSummary();
+    promptText = `${vaultSummary}\n\n${promptText}`;
+  }
+
   const ctx = {
-    Body: appendCronStyleCurrentTimeLine(prompt, cfg, startedAt),
+    Body: appendCronStyleCurrentTimeLine(promptText, cfg, startedAt),
     From: sender,
     To: sender,
     Provider: hasExecCompletion ? "exec-event" : hasCronEvents ? "cron-event" : "heartbeat",
