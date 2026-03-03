@@ -817,6 +817,55 @@ export async function runEmbeddedAttempt(
         };
       }
 
+      // XML Tool Payload Sanitization (Monkeypatch)
+      // Strip hallucinated XML tags (like `</arg_value>`) from LLM tool names
+      // before they cascade back to pi-agent-core and throw "Tool not found" errors.
+      const originalStreamFn = activeSession.agent.streamFn;
+      activeSession.agent.streamFn = (model, context, options) => {
+        const stream = originalStreamFn(model, context, options);
+        if (typeof stream === "object" && stream !== null && "push" in stream) {
+          const streamRecord = stream as unknown as Record<string, unknown>;
+          if (typeof streamRecord.push === "function") {
+            const originalPush = streamRecord.push.bind(stream);
+            streamRecord.push = (event: unknown) => {
+              const ev = event as Record<string, unknown>;
+              if ((ev.type === "toolcall_start" || ev.type === "toolcall_end") && ev.toolCall) {
+                const tc = ev.toolCall as Record<string, unknown>;
+                if (typeof tc.name === "string") {
+                  const cleanedName = tc.name.replace(/<\/[^>]+>$/, "");
+                  if (cleanedName !== tc.name) {
+                    tc.name = cleanedName;
+                  }
+                }
+              }
+              // Also sanitize the partial block to ensure transcript is fixed
+              if (ev.partial && typeof ev.partial === "object") {
+                const partial = ev.partial as Record<string, unknown>;
+                if (Array.isArray(partial.content)) {
+                  for (const block of partial.content) {
+                    if (
+                      block &&
+                      typeof block === "object" &&
+                      (block as Record<string, unknown>).type === "toolCall"
+                    ) {
+                      const b = block as Record<string, unknown>;
+                      if (typeof b.name === "string") {
+                        const cleanedName = b.name.replace(/<\/[^>]+>$/, "");
+                        if (cleanedName !== b.name) {
+                          b.name = cleanedName;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              return originalPush(event);
+            };
+          }
+        }
+        return stream;
+      };
+
       if (anthropicPayloadLogger) {
         activeSession.agent.streamFn = anthropicPayloadLogger.wrapStreamFn(
           activeSession.agent.streamFn,
