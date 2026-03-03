@@ -188,7 +188,8 @@ const GovernanceConsultSchema = Type.Object({
   message: Type.Optional(Type.String()),
 });
 
-export function createGovernanceTool(): AnyAgentTool {
+export function createGovernanceTool(options?: { agentId?: string }): AnyAgentTool {
+  const senderId = options?.agentId || "manager";
   return {
     label: "Governance",
     name: "governance",
@@ -408,7 +409,7 @@ ${
                 recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
-                sender: "manager",
+                sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
               // Immediately wake the executive agent so the escalation is not silently pending
@@ -611,7 +612,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
-                sender: "manager",
+                sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
               // Immediately wake the executive agent so the escalation is not silently pending
@@ -1100,7 +1101,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
-                sender: "manager",
+                sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
               // Immediately wake the executive agent so the escalation is not silently pending
@@ -1215,7 +1216,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
-                sender: "manager",
+                sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
               // Immediately wake the executive agent so the escalation is not silently pending
@@ -2140,7 +2141,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               return jsonResult({ success: false, error: "escalationId and decision required" });
             }
             // Fetch original escalation to determine sender and mark as processed
-            let finalEscalationPath = ["system", "main", "user"];
+            let finalEscalationPath = ["main", "user"];
             try {
               const originalEvent = await vault.read<{
                 id: string;

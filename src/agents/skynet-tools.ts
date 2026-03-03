@@ -163,7 +163,14 @@ export function createSkynetTools(options?: {
     createSubagentsTool({
       agentSessionKey: options?.agentSessionKey,
     }),
-    createGovernanceTool(),
+    createGovernanceTool({
+      agentId:
+        options?.requesterAgentIdOverride ||
+        resolveSessionAgentId({
+          sessionKey: options?.agentSessionKey,
+          config: options?.config,
+        }),
+    }),
     createSessionStatusTool({
       agentSessionKey: options?.agentSessionKey,
       config: options?.config,
