@@ -1,5 +1,9 @@
 import { createRequire } from "node:module";
 import { resolveEffectiveMessagesConfig, resolveHumanDelayConfig } from "../../agents/identity.js";
+import {
+  createMemoryUpsertTool,
+  createMemoryGetEntityTool,
+} from "../../agents/tools/memory-json-tool.js";
 import { createMemoryGetTool, createMemorySearchTool } from "../../agents/tools/memory-tool.js";
 import { handleSlackAction } from "../../agents/tools/slack-actions.js";
 import {
@@ -280,6 +284,8 @@ function createRuntimeTools(): PluginRuntime["tools"] {
   return {
     createMemoryGetTool,
     createMemorySearchTool,
+    createMemoryUpsertTool,
+    createMemoryGetEntityTool,
     registerMemoryCli,
   };
 }

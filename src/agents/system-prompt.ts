@@ -42,12 +42,18 @@ function buildMemorySection(params: {
   if (params.isMinimal) {
     return [];
   }
-  if (!params.availableTools.has("memory_search") && !params.availableTools.has("memory_get")) {
+  if (
+    !params.availableTools.has("memory_search") &&
+    !params.availableTools.has("memory_get") &&
+    !params.availableTools.has("memory_upsert") &&
+    !params.availableTools.has("memory_get_entity")
+  ) {
     return [];
   }
   const lines = [
     "## Memory Recall",
-    "Before answering anything about prior work, decisions, dates, people, preferences, or todos: run memory_search on MEMORY.md + memory/*.md; then use memory_get to pull only the needed lines. If low confidence after search, say you checked.",
+    "Before answering anything about prior work, decisions, dates, people, preferences, or todos: run memory_search on MEMORY.md + memory/*.md; or use memory_get_entity to retrieve structured knowledge.",
+    "For writing facts and entity properties: use `memory_upsert(namespace, key, value)` to save them permanently. Use the JSON entity memory system instead of writing to MEMORY.md directly.",
   ];
   if (params.citationsMode === "off") {
     lines.push(

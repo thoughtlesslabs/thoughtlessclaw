@@ -114,6 +114,22 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     includeInSkynetGroup: true,
   },
   {
+    id: "memory_upsert",
+    label: "memory_upsert",
+    description: "Write JSON memory facts",
+    sectionId: "memory",
+    profiles: ["coding", "messaging"],
+    includeInSkynetGroup: true,
+  },
+  {
+    id: "memory_get_entity",
+    label: "memory_get_entity",
+    description: "Read JSON memory entities",
+    sectionId: "memory",
+    profiles: ["coding", "messaging"],
+    includeInSkynetGroup: true,
+  },
+  {
     id: "sessions_list",
     label: "sessions_list",
     description: "List sessions",

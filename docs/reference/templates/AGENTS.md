@@ -20,28 +20,27 @@ Before doing anything else:
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
-4. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+4. **If in MAIN SESSION** (direct chat with your human): Search for relevant long-term context using `memory_search` or `memory_get_entity` if an entity is mentioned.
 
 Don't ask permission. Just do it.
 
 ## Memory
 
-You wake up fresh each session. These files are your continuity:
+You wake up fresh each session. Your continuity is handled via JSON data stores:
 
 - **Daily notes:** `memory/YYYY-MM-DD.md` (create `memory/` if needed) — raw logs of what happened
-- **Long-term:** `MEMORY.md` — your curated memories, like a human's long-term memory
+- **Facts & Preferences:** Use `memory_upsert(namespace, key, value)`
+- **Entities & Concepts:** Retrieve structured info with `memory_get_entity(entity)`
 
-Capture what matters. Decisions, context, things to remember. Skip the secrets unless asked to keep them.
+### 🧠 The Fact Store - Your Long-Term Memory
 
-### 🧠 MEMORY.md - Your Long-Term Memory
-
-- **ONLY load in main session** (direct chats with your human)
-- **DO NOT load in shared contexts** (Discord, group chats, sessions with other people)
+- **ONLY read/write facts in your main session** (direct chats with your human)
+- **DO NOT retrieve long-term facts in shared contexts** (Discord, group chats) unless necessary for the task
 - This is for **security** — contains personal context that shouldn't leak to strangers
-- You can **read, edit, and update** MEMORY.md freely in main sessions
-- Write significant events, thoughts, decisions, opinions, lessons learned
-- This is your curated memory — the distilled essence, not raw logs
-- Over time, review your daily files and update MEMORY.md with what's worth keeping
+- You can **store facts freely** using the memory tools.
+- Write significant events, thoughts, decisions, opinions, lessons learned using `memory_upsert`.
+- Store user preferences under `user.preferences.*`.
+- Over time, review your daily files and store important new facts.
 
 ### 📝 Write It Down - No "Mental Notes"!
 
