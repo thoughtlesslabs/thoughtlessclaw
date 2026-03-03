@@ -1965,7 +1965,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                     createdAt: number;
                     updatedAt: number;
                     metadata: Record<string, unknown>;
-                  }>(w);
+                  }>(`projects/${proj}/workers/${w}`);
                   if (workerState) {
                     workerList.push({
                       id: workerState.id,
