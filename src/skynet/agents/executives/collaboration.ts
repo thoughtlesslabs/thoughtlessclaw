@@ -3,7 +3,8 @@ import type { ExecutiveRole } from "./executive.js";
 
 export interface CollaborationResult {
   approved: boolean;
-  votes: Record<ExecutiveRole, "approve" | "reject" | "abstain">;
+  status: "pending" | "approved" | "rejected" | "escalated";
+  votes: Record<ExecutiveRole, "approve" | "reject" | "abstain" | "escalate">;
   improvements: string[];
   summary: string;
 }
@@ -48,7 +49,7 @@ export class ExecutiveCollaboration {
 
   async submitVote(
     executive: ExecutiveRole,
-    vote: "approve" | "reject" | "abstain",
+    vote: "approve" | "reject" | "abstain" | "escalate",
     notes?: string,
   ): Promise<void> {
     const proposal = await this.vault.read<ProposalEntry>(`proposals/${this.proposalId}.json`);
@@ -137,11 +138,17 @@ export class ExecutiveCollaboration {
       proposal.status = "approved";
       proposal.approvedAt = Date.now();
     } else {
-      const rejects = executives.filter((e) => proposal.votes[e] === "reject");
-      // If we failed to get approval and everyone has voted, OR we got 2 definitive rejects, reject it.
-      if (rejects.length >= 2 || votesCast >= expectedVoters.length) {
-        proposal.status = "rejected";
+      const escalates = executives.filter((e) => proposal.votes[e] === "escalate");
+      if (escalates.length > 0) {
+        proposal.status = "escalated";
         proposal.rejectedAt = Date.now();
+      } else {
+        const rejects = executives.filter((e) => proposal.votes[e] === "reject");
+        // If we failed to get approval and everyone has voted, OR we got 2 definitive rejects, reject it.
+        if (rejects.length >= 2 || votesCast >= expectedVoters.length) {
+          proposal.status = "rejected";
+          proposal.rejectedAt = Date.now();
+        }
       }
     }
 
@@ -157,6 +164,10 @@ export class ExecutiveCollaboration {
       const rejectedPath = `rejected/${this.proposalId}.json`;
       await this.vault.write(rejectedPath, proposal);
       await this.vault.delete(`proposals/${this.proposalId}.json`);
+    } else if (proposal.status === "escalated") {
+      const escalatedPath = `escalated/${this.proposalId}.json`;
+      await this.vault.write(escalatedPath, proposal);
+      await this.vault.delete(`proposals/${this.proposalId}.json`);
     }
 
     return approved;
@@ -167,6 +178,7 @@ export class ExecutiveCollaboration {
     if (!proposal) {
       return {
         approved: false,
+        status: "pending",
         votes: { main: "abstain", oversight: "abstain", monitor: "abstain", optimizer: "abstain" },
         improvements: [],
         summary: "Proposal not found",
@@ -175,14 +187,17 @@ export class ExecutiveCollaboration {
 
     return {
       approved: proposal.status === "approved",
-      votes: proposal.votes as Record<ExecutiveRole, "approve" | "reject" | "abstain">,
+      status: proposal.status,
+      votes: proposal.votes as Record<ExecutiveRole, "approve" | "reject" | "abstain" | "escalate">,
       improvements: proposal.improvements,
       summary:
         proposal.status === "approved"
           ? `Approved at ${new Date(proposal.approvedAt!).toISOString()}`
           : proposal.status === "rejected"
             ? `Rejected at ${new Date(proposal.rejectedAt!).toISOString()}`
-            : "Pending review",
+            : proposal.status === "escalated"
+              ? `Escalated to human routing at ${new Date(proposal.rejectedAt!).toISOString()}`
+              : "Pending review",
     };
   }
 
@@ -217,7 +232,7 @@ ${plan}
 Evaluate this proposal against your specific directives and responsibilities.
 
 Reply format MUST be exactly:
-VOTE: <APPROVE|REJECT|ABSTAIN>
+VOTE: <APPROVE|REJECT|ABSTAIN|ESCALATE>
 REASON: <Provide brief, actionable feedback or improvements based on your role>`;
 
         const sessionId = `eval-${exec}-${Date.now()}`;
@@ -241,13 +256,13 @@ REASON: <Provide brief, actionable feedback or improvements based on your role>`
             .map((p: { text?: string }) => p.text) || [];
         const text = outputs.join("\n").trim();
 
-        let vote: "approve" | "reject" | "abstain" = "abstain";
+        let vote: "approve" | "reject" | "abstain" | "escalate" = "abstain";
         let reason = "No reason provided.";
 
         if (text) {
-          const voteMatch = text.match(/VOTE:\s*(APPROVE|REJECT|ABSTAIN)/i);
+          const voteMatch = text.match(/VOTE:\s*(APPROVE|REJECT|ABSTAIN|ESCALATE)/i);
           if (voteMatch && voteMatch[1]) {
-            vote = voteMatch[1].toLowerCase() as "approve" | "reject" | "abstain";
+            vote = voteMatch[1].toLowerCase() as "approve" | "reject" | "abstain" | "escalate";
           }
           const reasonMatch = text.match(/REASON:\s*([\s\S]*)/i);
           if (reasonMatch && reasonMatch[1]) {

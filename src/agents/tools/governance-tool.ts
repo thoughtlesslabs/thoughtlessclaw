@@ -576,6 +576,39 @@ The Interceptor will catch your trigger line and handle everything automatically
             }
             const collab = createExecutiveCollaboration(vault, proposalId);
             const result = await collab.getResult();
+
+            // Intercept explicitly escalated proposals to fallback to Main
+            if (!result.approved && result.status === "escalated") {
+              const fallbackId = `escalation-triad-failed-${Date.now()}`;
+              const projName = "system"; // General fallback
+
+              const triageEvent = {
+                id: fallbackId,
+                path: `events/${fallbackId}.json`,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                metadata: { proposalId, projectName: projName },
+                type: "event",
+                eventType: "escalation:triad→main",
+                eventData: JSON.stringify({
+                  message: `The Triad failed to reach consensus on Proposal ${proposalId}. Please review the Manager's blocker and either resolve it directly using create-decision or escalate it to the User (Miles) via Telegram.`,
+                  previousImprovements: result.improvements,
+                  projectName: projName,
+                }),
+                recipient: "main",
+                timestamp: Date.now(),
+                status: "pending",
+                sender: senderId,
+              };
+              await vault.write(`events/${fallbackId}.json`, triageEvent);
+
+              try {
+                requestHeartbeatNow({ reason: "triad-failure-triage", agentId: "main" });
+              } catch {}
+
+              result.summary = `${result.summary} - [NERVOUS SYSTEM] Escalation Triaged to Main Executive for final human routing.`;
+            }
+
             return jsonResult({ success: true, type: "proposal-status", result });
           }
 
@@ -806,30 +839,35 @@ The Interceptor will catch your trigger line and handle everything automatically
               return jsonResult({ success: false, error: "question or message required" });
             }
 
-            const evtId = `escalate-${Date.now()}`;
-            const evt = {
-              id: evtId,
-              path: `events/${evtId}.json`,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              metadata: { projectName: projName, proposedSolution },
-              type: "event",
-              eventType: "manager-escalation",
-              eventData: JSON.stringify({ message: text, proposedSolution, projectName: projName }),
-              recipient: "main",
-              timestamp: Date.now(),
-              status: "pending",
-              sender: projName ? `manager-${projName}` : "system",
-            };
-            await vault.write(`events/${evtId}.json`, evt);
+            // Bypass Main entirely - instantiate an escalation proposal immediately for the Triad
+            const proposalId = await ExecutiveCollaboration.createProposal(
+              vault,
+              text,
+              proposedSolution || "Requires executive analysis.",
+              senderId as import("../../skynet/agents/executives/executive.js").ExecutiveRole,
+            );
+
+            // Re-read and forcefully inject metadata since createProposal doesn't accept dynamic metadata yet
+            const proposal = await vault.read<import("../../skynet/vault/index.js").ProposalEntry>(
+              `proposals/${proposalId}.json`,
+            );
+            if (proposal) {
+              proposal.metadata = { isEscalation: true, projectName: projName };
+              // Override title to inject into event system correctly if needed
+              proposal.request = `Escalation: ${text.slice(0, 80)}...\n\nBody: ${text}`;
+              await vault.write(`proposals/${proposalId}.json`, proposal);
+            }
 
             try {
-              requestHeartbeatNow({ reason: "manager-escalation", agentId: "main" });
+              requestHeartbeatNow({ reason: "manager-escalation", agentId: "oversight" });
+              requestHeartbeatNow({ reason: "manager-escalation", agentId: "monitor" });
+              requestHeartbeatNow({ reason: "manager-escalation", agentId: "optimizer" });
             } catch {}
 
             return jsonResult({
               success: true,
-              directive: "[NERVOUS_SYSTEM] Escalation delivered to Main Executive.",
+              directive: `[NERVOUS_SYSTEM] Escalation proposal ${proposalId} submitted to Triad (Oversight/Monitor/Optimizer) for review.`,
+              proposalId,
             });
           }
 
@@ -1986,7 +2024,15 @@ The Interceptor will catch your trigger line and handle everything automatically
           }
 
           case "system-status": {
-            const managers = await vault.list("projects/");
+            const projectDirs = await vault.listDirs("projects/");
+            let managersCount = 0;
+            for (const p of projectDirs) {
+              const hasManager = await vault.exists(`projects/${p}/manager.json`);
+              if (hasManager) {
+                managersCount++;
+              }
+            }
+
             const workers = await vault.list("projects/system/workers/");
             const proposals = await vault.list("proposals/");
             const tasks = await vault.list("tasks/");
@@ -2000,7 +2046,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               },
               cpuCount: os.cpus().length,
               platform: os.platform(),
-              managersCount: managers.filter((m) => m.includes("/manager.json")).length,
+              managersCount,
               workersCount: workers.filter((w) => w.endsWith(".json")).length,
               proposalsCount: proposals.filter((p) => p.endsWith(".json")).length,
               pendingTasks: tasks.filter((t) => {
@@ -2264,6 +2310,61 @@ The Interceptor will catch your trigger line and handle everything automatically
                 /* best-effort wake */
               }
             }
+
+            // --- RL Feedback Loop Closure ---
+            // Now that the decision is propagated back down the chain, record the structural outcome
+            // so the patternLearner can index this specific type of manager blocker
+            if (decision.originalEscalationId) {
+              const safeEscalationId =
+                typeof decision.originalEscalationId === "string"
+                  ? decision.originalEscalationId
+                  : typeof decision.originalEscalationId === "number"
+                    ? decision.originalEscalationId.toString()
+                    : JSON.stringify(decision.originalEscalationId);
+
+              const originalEscalation = await vault.read<{
+                id: string;
+                path: string;
+                createdAt: number;
+                updatedAt: number;
+                eventData: string;
+                metadata: Record<string, unknown>;
+              }>(`events/${safeEscalationId}.json`);
+
+              if (originalEscalation && originalEscalation.eventData) {
+                try {
+                  const eventPayload = JSON.parse(originalEscalation.eventData);
+                  const patternLearner = getPatternLearner(
+                    vault as unknown as import("../../skynet/vault/manager.js").VaultManager,
+                  );
+                  const contextTitle =
+                    eventPayload.message || eventPayload.question || "Unknown Escalation";
+                  const isApproved = decision.decision === "approved";
+
+                  if (isApproved) {
+                    await patternLearner.recordApproval(
+                      `escalation:${safeEscalationId}`,
+                      "manager-escalation",
+                      String(contextTitle).slice(0, 100),
+                      { proposedSolution: decision.proposedSolution },
+                      true,
+                    );
+                  } else {
+                    await patternLearner.recordRejection(
+                      `escalation:${safeEscalationId}`,
+                      "manager-escalation",
+                      String(contextTitle).slice(0, 100),
+                      { proposedSolution: decision.proposedSolution },
+                      "Triad/Main Rejected Proposal",
+                    );
+                  }
+                } catch {
+                  // Suppress JSON parse errors on legacy events
+                }
+              }
+            }
+            // --------------------------------
+
             decision.status = "propagated";
             await vault.write(
               decisionPath,

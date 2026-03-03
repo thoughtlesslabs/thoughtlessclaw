@@ -209,14 +209,14 @@ export interface ProjectManagerState extends VaultEntry {
 
 export interface ProposalEntry extends VaultEntry {
   type: "proposal";
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "escalated";
   requester: "main" | "oversight" | "monitor" | "optimizer";
   request: string;
   plan: string;
   improvements: string[];
   votes: Record<
     "main" | "oversight" | "monitor" | "optimizer",
-    "approve" | "reject" | "abstain" | undefined
+    "approve" | "reject" | "abstain" | "escalate" | undefined
   >;
   approvedAt: number | null;
   rejectedAt: number | null;
@@ -226,7 +226,7 @@ export interface VoteEntry extends VaultEntry {
   type: "vote";
   proposalId: string;
   voter: "main" | "oversight" | "monitor" | "optimizer";
-  vote: "approve" | "reject" | "abstain";
+  vote: "approve" | "reject" | "abstain" | "escalate";
   notes: string | undefined;
   timestamp: number;
 }

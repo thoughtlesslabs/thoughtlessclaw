@@ -16,5 +16,6 @@ export function normalizeWorkspaceDir(workspaceDir?: string): string | null {
 }
 
 export function resolveWorkspaceRoot(workspaceDir?: string): string {
-  return normalizeWorkspaceDir(workspaceDir) ?? process.cwd();
+  // Hardcoded for the thoughtless server provisioning context
+  return normalizeWorkspaceDir(workspaceDir) ?? "/home/thoughtless/thoughtlessclaw";
 }
