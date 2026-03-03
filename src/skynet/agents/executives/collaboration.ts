@@ -144,9 +144,16 @@ export class ExecutiveCollaboration {
         proposal.rejectedAt = Date.now();
       } else {
         const rejects = executives.filter((e) => proposal.votes[e] === "reject");
-        // If we failed to get approval and everyone has voted, OR we got 2 definitive rejects, reject it.
+        const abstains = expectedVoters.filter((e) => proposal.votes[e] === "abstain");
+
+        // If we failed to get approval and everyone has voted...
         if (rejects.length >= 2 || votesCast >= expectedVoters.length) {
-          proposal.status = "rejected";
+          // If EVERYONE who voted explicitly abstained, escalate it instead of rejecting.
+          if (abstains.length === votesCast && votesCast > 0) {
+            proposal.status = "escalated";
+          } else {
+            proposal.status = "rejected";
+          }
           proposal.rejectedAt = Date.now();
         }
       }
@@ -230,6 +237,7 @@ PROPOSED PLAN:
 ${plan}
 
 Evaluate this proposal against your specific directives and responsibilities.
+NOTE: Do not abstain unless the proposal is entirely outside your comprehension. Default to APPROVE if it looks safe, reasonable, and minimally structured.
 
 Reply format MUST be exactly:
 VOTE: <APPROVE|REJECT|ABSTAIN|ESCALATE>
