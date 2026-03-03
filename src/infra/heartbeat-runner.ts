@@ -126,6 +126,12 @@ function hasExplicitHeartbeatAgents(cfg: SkynetConfig) {
 
 export function isHeartbeatEnabledForAgent(cfg: SkynetConfig, agentId?: string): boolean {
   const resolvedAgentId = normalizeAgentId(agentId ?? resolveDefaultAgentId(cfg));
+
+  // Executive Triad + Main automatically get heartbeats
+  if (["main", "oversight", "monitor", "optimizer"].includes(resolvedAgentId)) {
+    return true;
+  }
+
   const list = cfg.agents?.list ?? [];
   const hasExplicit = hasExplicitHeartbeatAgents(cfg);
   if (hasExplicit) {
@@ -198,17 +204,46 @@ export function resolveHeartbeatSummaryForAgent(
 
 function resolveHeartbeatAgents(cfg: SkynetConfig): HeartbeatAgent[] {
   const list = cfg.agents?.list ?? [];
+
+  // Ensure the triad is always included
+  const triadIds = ["main", "oversight", "monitor", "optimizer"];
+  const triadAgents = triadIds.map((id) => ({
+    agentId: id,
+    heartbeat: resolveHeartbeatConfig(cfg, id),
+  }));
+
   if (hasExplicitHeartbeatAgents(cfg)) {
-    return list
+    const explicitAgents = list
       .filter((entry) => entry?.heartbeat)
       .map((entry) => {
         const id = normalizeAgentId(entry.id);
         return { agentId: id, heartbeat: resolveHeartbeatConfig(cfg, id) };
       })
       .filter((entry) => entry.agentId);
+
+    // Merge explicit with triad, avoiding duplicates
+    const allAgents = [...explicitAgents];
+    for (const triadAgent of triadAgents) {
+      if (!allAgents.some((a) => a.agentId === triadAgent.agentId)) {
+        allAgents.push(triadAgent);
+      }
+    }
+    return allAgents;
   }
+
   const fallbackId = resolveDefaultAgentId(cfg);
-  return [{ agentId: fallbackId, heartbeat: resolveHeartbeatConfig(cfg, fallbackId) }];
+  const fallbackAgents = [
+    { agentId: fallbackId, heartbeat: resolveHeartbeatConfig(cfg, fallbackId) },
+  ];
+
+  // Merge fallback with triad, avoiding duplicates
+  const allAgents = [...fallbackAgents];
+  for (const triadAgent of triadAgents) {
+    if (!allAgents.some((a) => a.agentId === triadAgent.agentId)) {
+      allAgents.push(triadAgent);
+    }
+  }
+  return allAgents;
 }
 
 export function resolveHeartbeatIntervalMs(

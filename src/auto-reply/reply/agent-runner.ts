@@ -578,6 +578,7 @@ export async function runReplyAgent(params: {
                     }),
                     recipient: "broadcast",
                     timestamp: Date.now(),
+                    status: "pending",
                   };
                   await vault.write(`events/${eventId}.json`, event);
                   // Wake the project manager immediately

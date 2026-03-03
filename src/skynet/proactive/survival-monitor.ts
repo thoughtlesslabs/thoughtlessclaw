@@ -90,6 +90,17 @@ export function createSurvivalMonitorHandler(): TickHandler {
               `[NERVOUS_SYSTEM] Resource capacities have recovered. SURVIVAL MODE deactivated. System returning to NORMAL operations. Managers will begin reclaiming pending tasks.`,
               { sessionKey: "global", contextKey: "SURVIVAL-MODE-RECOVERY" },
             );
+            try {
+              console.log("[survival-monitor] Waking Executive Triad to resume operations...");
+              const { requestHeartbeatNow } = await import("../../infra/heartbeat-wake.js");
+              requestHeartbeatNow({ reason: "survival-recovery", agentId: "main" });
+              requestHeartbeatNow({ reason: "survival-recovery", agentId: "monitor" });
+            } catch (err) {
+              console.error(
+                "[survival-monitor] Failed to broadcast recovery wake to Executives:",
+                err,
+              );
+            }
           }
         }
       } catch (err) {

@@ -196,6 +196,7 @@ export class TickHandlerRegistry {
           provider: string;
           model?: string;
           status: "healthy" | "cooldown" | "half-open" | "expired";
+          cooldownEndsAt?: number;
         }
       > = {};
 
@@ -223,13 +224,17 @@ export class TickHandlerRegistry {
           }
         }
 
+        let cooldownEndsAt: number | undefined = undefined;
+
         if (status !== "expired") {
           if (stats.halfOpenActive) {
             status = "half-open";
           } else if (stats.disabledUntil && stats.disabledUntil > now) {
             status = "cooldown";
+            cooldownEndsAt = stats.disabledUntil;
           } else if (stats.cooldownUntil && stats.cooldownUntil > now) {
             status = "cooldown";
+            cooldownEndsAt = stats.cooldownUntil;
           }
         }
 
@@ -238,6 +243,7 @@ export class TickHandlerRegistry {
           // Extract model from profile ID if it follows formatting style "provider:model"
           model: profileId.includes(":") ? profileId.split(":")[1] : undefined,
           status,
+          cooldownEndsAt,
         };
       });
 

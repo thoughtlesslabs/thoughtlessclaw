@@ -250,13 +250,21 @@ export function createGovernanceTool(): AnyAgentTool {
                 const rawHealth = await fs.readFile(healthPath, "utf-8");
                 const healthData = JSON.parse(rawHealth) as Record<
                   string,
-                  { provider: string; model?: string; status: string }
+                  { provider: string; model?: string; status: string; cooldownEndsAt?: number }
                 >;
 
+                const now = Date.now();
                 const lines = Object.entries(healthData).map(([, data]) => {
                   const icon =
                     data.status === "healthy" ? "✅" : data.status === "half-open" ? "⚠️" : "❌";
-                  return `${icon} **${data.provider}** (${data.model || "default"}): ${data.status}`;
+
+                  let timeStr = "";
+                  if (data.cooldownEndsAt && data.cooldownEndsAt > now) {
+                    const mins = Math.ceil((data.cooldownEndsAt - now) / 60000);
+                    timeStr = ` (${mins}m remaining)`;
+                  }
+
+                  return `${icon} **${data.provider}** (${data.model || "default"}): ${data.status}${timeStr}`;
                 });
                 modelsHealth =
                   lines.length > 0 ? lines.join("\n") : "No routing profiles configured.";
@@ -397,7 +405,7 @@ ${
                   question: `Requesting approval to spawn ${workerType} worker for: ${taskDescription}`,
                   projectName,
                 }),
-                recipient: "executive",
+                recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
                 sender: "manager",
@@ -599,7 +607,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   question: `Requesting approval to hire manager for project ${projectName}: ${description}`,
                   projectName,
                 }),
-                recipient: "executive",
+                recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
                 sender: "manager",
@@ -1088,7 +1096,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   question: `Requesting approval to create task: ${title}`,
                   projectName: rLProjectName,
                 }),
-                recipient: "executive",
+                recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
                 sender: "manager",
@@ -1203,7 +1211,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   question: `Requesting approval to assign task ${taskId} to project ${projectName}`,
                   projectName,
                 }),
-                recipient: "executive",
+                recipient: "main",
                 timestamp: Date.now(),
                 status: "pending",
                 sender: "manager",
@@ -2055,6 +2063,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               eventData,
               recipient: recipient || "broadcast",
               timestamp: Date.now(),
+              status: "pending",
             };
             await vault.write(`events/${eventId}.json`, event);
             return jsonResult({
@@ -2067,7 +2076,7 @@ The Interceptor will catch your trigger line and handle everything automatically
           }
 
           case "poll-events": {
-            const since = (params.since as number) || Date.now() - 60000;
+            const since = (params.since as number) || Date.now() - 86400000; // 24 hours
             const recipient = params.recipient as string;
             const events = await vault.list("events/");
             const relevantEvents: Array<{
@@ -2075,6 +2084,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               eventType: string;
               eventData: string;
               timestamp: number;
+              status?: string;
             }> = [];
             for (const e of events) {
               if (!e.endsWith(".json")) {
@@ -2089,9 +2099,14 @@ The Interceptor will catch your trigger line and handle everything automatically
                 path: string;
                 createdAt: number;
                 updatedAt: number;
+                status?: string;
                 metadata: Record<string, unknown>;
               }>(e);
-              if (event && event.timestamp > since) {
+              if (
+                event &&
+                event.timestamp > since &&
+                (!event.status || event.status === "pending")
+              ) {
                 if (
                   !recipient ||
                   event.recipient === "broadcast" ||
@@ -2102,6 +2117,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                     eventType: event.eventType,
                     eventData: event.eventData,
                     timestamp: event.timestamp,
+                    status: event.status || "pending",
                   });
                 }
               }
@@ -2140,6 +2156,28 @@ The Interceptor will catch your trigger line and handle everything automatically
               status: "pending_propagation",
             };
             await vault.write(`decisions/${decisionId}.json`, decisionEntry);
+
+            // Mark the original escalation as processed
+            try {
+              const originalEvent = await vault.read<{
+                id: string;
+                path: string;
+                createdAt: number;
+                updatedAt: number;
+                metadata: Record<string, unknown>;
+                type: "event";
+                status?: string;
+                [key: string]: unknown;
+              }>(`events/${escalationId}.json`);
+              if (originalEvent) {
+                originalEvent.status = "processed";
+                originalEvent.updatedAt = Date.now();
+                await vault.write(`events/${escalationId}.json`, originalEvent);
+              }
+            } catch (err) {
+              console.error(`Failed to mark escalation ${escalationId} as processed:`, err);
+            }
+
             return jsonResult({ success: true, type: "decision-created", decisionId, decision });
           }
 
