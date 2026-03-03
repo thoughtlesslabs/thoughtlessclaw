@@ -1775,13 +1775,14 @@ The Interceptor will catch your trigger line and handle everything automatically
 
             const workerPrompt = `# You are a ${config.description}\n\nYour capabilities: ${config.capabilities.join(", ")}\n\nModel preference: ${config.defaultModelPreference || "claude-sonnet-4-6"}\n\nTask: ${task}\n\nComplete this task and report back with:\n- What you accomplished\n- Any artifacts created\n- Any errors encountered\n\nUse the Skynet tools to complete your task. When done, summarize your work.`;
 
+            const projectName = (params.projectName as string) || "system";
             const taskId = `task-${Date.now()}`;
             const taskEntry = {
               id: taskId,
               path: `tasks/${taskId}.json`,
               createdAt: Date.now(),
               updatedAt: Date.now(),
-              metadata: {},
+              metadata: { projectName },
               type: "task",
               title: `Worker: ${workerType}`,
               description: task,
@@ -1862,7 +1863,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               path: `tasks/${taskId}.json`,
               createdAt: Date.now(),
               updatedAt: Date.now(),
-              metadata: {},
+              metadata: { projectName },
               type: "task",
               title: `Worker: ${workerType}`,
               description: task,
@@ -2369,6 +2370,10 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender?: string;
                 status?: string;
                 path: string;
+                createdAt: number;
+                updatedAt: number;
+                metadata: Record<string, unknown>;
+                type: "event";
               }>(e);
 
               if (!event || (event.status && event.status !== "pending")) {
@@ -2452,7 +2457,10 @@ The Interceptor will catch your trigger line and handle everything automatically
                   assignee?: string | null;
                   createdAt: number;
                   completedAt?: number | null;
-                  metadata?: { projectName?: string };
+                  metadata: Record<string, unknown>;
+                  path: string;
+                  updatedAt: number;
+                  type: "task";
                 }>(`tasks/${t}`)
                 .catch(() => null);
 

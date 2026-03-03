@@ -200,7 +200,10 @@ ${new Date().toISOString()}
       const { resolveSkynetAgentDir } = await import("../../../agents/agent-paths.js");
 
       const config = (globalThis as unknown as Record<string, unknown>).__skynet_config; // Assumes config is available via DI or global
-      await ensureSkynetModelsJson(config, resolveSkynetAgentDir());
+      await ensureSkynetModelsJson(
+        config as Parameters<typeof ensureSkynetModelsJson>[0],
+        resolveSkynetAgentDir(),
+      );
 
       const prompt = `You are a specialist Tier 3 Skynet Worker (${workerType}).
       
