@@ -121,7 +121,7 @@ export class PriorityBoard {
       if (!p.endsWith(".json") || p.endsWith(".init")) {
         continue;
       }
-      const priority = await this.vault.read<PriorityEntry>(p);
+      const priority = await this.vault.read<PriorityEntry>(`priorities/active/${p}`);
       if (priority && !priority.resolved) {
         const score = this.calculateScore(priority);
         result.push({ priority, score });

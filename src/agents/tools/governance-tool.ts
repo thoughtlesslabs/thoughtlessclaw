@@ -2152,7 +2152,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 updatedAt: number;
                 status?: string;
                 metadata: Record<string, unknown>;
-              }>(e);
+              }>(`events/${e}`);
               if (
                 event &&
                 event.timestamp > since &&
@@ -2475,7 +2475,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 updatedAt: number;
                 metadata: Record<string, unknown>;
                 type: "event";
-              }>(e);
+              }>(`events/${e}`);
 
               if (!event || (event.status && event.status !== "pending")) {
                 continue;
