@@ -1131,9 +1131,12 @@ export function startHeartbeatRunner(opts: {
     const prevEnabled = prevAgents.size > 0;
     const nextAgents = new Map<string, HeartbeatAgentState>();
     const intervals: number[] = [];
-    for (const agent of resolveHeartbeatAgents(cfg)) {
+    const allHeartbeatAgents = resolveHeartbeatAgents(cfg);
+
+    for (const agent of allHeartbeatAgents) {
       const intervalMs = resolveHeartbeatIntervalMs(cfg, undefined, agent.heartbeat);
       if (!intervalMs) {
+        log.debug(`heartbeat: skipping agent ${agent.agentId} (no interval)`);
         continue;
       }
       intervals.push(intervalMs);
@@ -1151,11 +1154,25 @@ export function startHeartbeatRunner(opts: {
     state.cfg = cfg;
     state.agents = nextAgents;
     const nextEnabled = nextAgents.size > 0;
+
+    // Log heartbeat agent registration with details
+    if (!initialized || nextAgents.size !== prevAgents.size) {
+      const agentIds = Array.from(nextAgents.keys());
+      log.info(`heartbeat: agents registered`, {
+        count: nextAgents.size,
+        agents: agentIds.join(", "),
+        intervals: intervals.length > 0 ? `min=${Math.min(...intervals)}ms` : "none",
+      });
+    }
+
     if (!initialized) {
       if (!nextEnabled) {
         log.info("heartbeat: disabled", { enabled: false });
       } else {
-        log.info("heartbeat: started", { intervalMs: Math.min(...intervals) });
+        log.info("heartbeat: started", {
+          intervalMs: Math.min(...intervals),
+          agentCount: nextAgents.size,
+        });
       }
       initialized = true;
     } else if (prevEnabled !== nextEnabled) {
