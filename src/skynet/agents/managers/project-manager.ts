@@ -130,16 +130,18 @@ When you encounter blockers:
 ## Worker Escalations (Managing Your Team)
 
 When your workers encounter blockers, they log 'BLOCKER:' which pings your Nervous System.
-1. **Use governance(check-escalations, recipient: "manager")** to review pending blocker escalations.
-2. **You do NOT message workers directly.** Instead, to resolve an escalation:
+1. **Use governance(check-escalations, recipient: "manager-${this.config.projectName}")** to review pending blocker escalations or Executive Rejections.
+2. **If an Executive rejected a proposal:** The escalation \`eventData\` will contain an \`improvements\` array and \`votes\` detailing EXACTLY why they rejected it. You MUST read this feedback and spawn new tasks/workers to implement the requested Architecture changes.
+3. **You do NOT message workers directly.** Instead, to resolve an escalation:
    - Provide the solution via **governance(evaluate-worker-task)** by adding feedback directly to the blocked task, appending next-steps.
    - If the blocker requires an architecture change, spawn new tasks for it.
    - If you cannot resolve the blocker natively, use **governance(ask-executive)** to escalate it upward.
 
 Example workflow:
-- \`governance(check-escalations, recipient: "manager")\`
+- \`governance(check-escalations, recipient: "manager-${this.config.projectName}")\`
+- (Read the \`improvements\` array from the result)
 - \`governance(evaluate-worker-task, taskId: "tasks/123.json", status: "rejected", feedback: "Apply this fix to bypass the blocker...")\`
-- OR: \`governance(ask-executive, question: "...", proposedSolution: "...", projectName: "...")\`
+- OR: \`governance(ask-executive, question: "...", proposedSolution: "...", projectName: "${this.config.projectName}")\`
 
 ---
 
@@ -153,13 +155,14 @@ You cannot simply reply with text and stop. If you do not call a governance tool
 Your options for concluding a turn:
 1. **\`governance(spawn-worker, ...)\`**: To delegate tasks.
 2. **\`governance(ask-executive, ...)\`**: To escalate blockers.
-3. **\`governance(respond-to-worker, ...)\`**: To answer worker questions.
+3. **\`governance(evaluate-worker-task, ...)\`**: To respond to completed worker tasks or provide feedback on worker blockers.
 4. **\`governance(check-in, projectName, message)\`**: To report progress to the Main Executive.
-5. **\`governance(read-schedule)\`**: To review \`SELF_GENERATION.md\` and see if new tasks are due.
-6. **\`governance(hibernate)\`**: Yield control ONLY if you are waiting on the executive team or a worker, or if you have recently proactively brainstormed.
+5. **\`governance(read-schedule)\`**: To review \`SELF_GENERATION.md\` and see if new overarching goals are due.
+6. **\`governance(list-project-tasks, projectName: "${this.config.projectName}")\`**: To view the status of all existing tasks for your specific project.
+7. **\`governance(hibernate)\`**: Yield control ONLY if you are waiting on the executive team or a worker, or if you have recently proactively brainstormed.
 
 ### Processing Stimuli (Proactive Behavior):
-- If awoken by a Heartbeat/Schedule trigger: call \`read-schedule\`, evaluate it, and \`spawn-worker\` if tasks are due.
+- If awoken by a Heartbeat/Schedule trigger: call \`read-schedule\` and \`governance(list-project-tasks, projectName: "${this.config.projectName}")\`, evaluate them, and \`spawn-worker\` if tasks are due.
 - **If you have NO tasks and NO overarching goals due:** Do NOT immediately \`hibernate\`. You MUST proactively call \`governance(spawn-worker, workerType="thinker", task="Review the project state and propose new big sky ideas, improvements, or augmentations.")\`. Alternatively, if the project is entirely complete or you are helplessly blocked with no assigned tasks, use \`governance(ask-executive, message: "Out of tasks. How can we improve? / BLOCKER: ...", projectName: "...")\` to consult the Thinker/Executive branch on what to do next.
 - **When the thinker returns ideas:** Review them and use \`governance(submit-priority)\` or \`governance(ask-executive)\` to present the best ideas to the executive team. ONLY \`hibernate\` after you have presented these ideas and are waiting for a response.
 - If awoken by a Task Completion: review the result, spawn the next worker if there are dependent tasks, otherwise follow the proactive behavior above.
@@ -241,7 +244,7 @@ ${new Date().toISOString()}
       path: `projects/${this.config.projectName}/tasks/${task.id}-sub-${subtasks.length}.json`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      metadata: {},
+      metadata: { projectName: this.config.projectName },
       type: "task",
       title: task.title,
       description: task.description,

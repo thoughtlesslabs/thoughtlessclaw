@@ -129,6 +129,8 @@ const GovernanceConsultSchema = Type.Object({
     Type.Literal("check-in"),
     Type.Literal("health-summary"),
     Type.Literal("ask-executive"),
+    Type.Literal("check-escalations"),
+    Type.Literal("list-project-tasks"),
   ]),
   request: Type.Optional(Type.String()),
   plan: Type.Optional(Type.String()),
@@ -2166,6 +2168,22 @@ The Interceptor will catch your trigger line and handle everything automatically
               console.error(`Failed to mark escalation ${escalationId} as processed:`, err);
             }
 
+            // Attempt to retrieve the actual proposal to capture executive reasons
+            let improvements: string[] = [];
+            let votes: Record<string, string> = {};
+            try {
+              // The escalationId originally gets passed through as the proposal request ID in most chains.
+              // To ensure we get the reasons, if 'improvements' or 'votes' are passed in via params, we capture them.
+              if (params.improvements && Array.isArray(params.improvements)) {
+                improvements = params.improvements as string[];
+              }
+              if (params.votes && typeof params.votes === "object") {
+                votes = params.votes as Record<string, string>;
+              }
+            } catch (err) {
+              console.error(`Failed to capture proposal feedback for decision:`, err);
+            }
+
             const decisionId = `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             const decisionEntry = {
               id: decisionId,
@@ -2179,6 +2197,8 @@ The Interceptor will catch your trigger line and handle everything automatically
               question,
               proposedSolution,
               decision,
+              improvements,
+              votes,
               decidedBy: "user",
               decidedAt: Date.now(),
               status: "pending_propagation",
@@ -2226,6 +2246,8 @@ The Interceptor will catch your trigger line and handle everything automatically
                   decisionId,
                   decision: decision.decision,
                   question: decision.question,
+                  improvements: decision.improvements || [],
+                  votes: decision.votes || {},
                   escalationPath,
                 }),
                 recipient,
@@ -2310,6 +2332,148 @@ The Interceptor will catch your trigger line and handle everything automatically
                   ? `Consider learning this pattern (${check.confidence}% approval history)`
                   : undefined,
               result,
+            });
+          }
+
+          case "check-escalations": {
+            const recipient = params.recipient as string;
+            const projectName = params.projectName as string | undefined;
+            if (!recipient) {
+              return jsonResult({ success: false, error: "recipient required" });
+            }
+
+            // Same logic as poll-events, but tailored strictly for the manager prompt flow
+            // filtering specifically for response elements that managers look for.
+            const events = await vault.list("events/");
+            const activeEscalations: Array<{
+              id: string;
+              eventType: string;
+              eventData: Record<string, unknown> | string;
+              timestamp: number;
+              status: string;
+            }> = [];
+
+            const senderFilter = projectName ? `manager-${projectName}` : undefined;
+
+            for (const e of events) {
+              if (!e.endsWith(".json")) {
+                continue;
+              }
+
+              const event = await vault.read<{
+                id: string;
+                eventType: string;
+                eventData: string;
+                timestamp: number;
+                recipient: string;
+                sender?: string;
+                status?: string;
+                path: string;
+              }>(e);
+
+              if (!event || (event.status && event.status !== "pending")) {
+                continue;
+              }
+
+              // 1. Direct match on recipient (e.g. "manager")
+              // 2. Or, if projectName is provided, match events where sender was manager-X returning back
+              const isDirectRecipient =
+                event.recipient === recipient || event.recipient === senderFilter;
+
+              if (isDirectRecipient || event.recipient === "broadcast") {
+                let parsedData: string | Record<string, unknown> = event.eventData;
+                try {
+                  parsedData = JSON.parse(event.eventData);
+                } catch {
+                  // Keep as string if parsing fails
+                }
+
+                activeEscalations.push({
+                  id: event.id,
+                  eventType: event.eventType,
+                  eventData: parsedData,
+                  timestamp: event.timestamp,
+                  status: event.status || "pending",
+                });
+
+                // Mark reviewed escalations as processed so they aren't stuck in the queue forever.
+                event.status = "processed";
+                await vault.write(
+                  event.path,
+                  event as unknown as Parameters<typeof vault.write>[1],
+                );
+              }
+            }
+
+            if (activeEscalations.length === 0) {
+              return jsonResult({
+                success: true,
+                type: "check-escalations",
+                count: 0,
+                message: "No pending escalations found.",
+              });
+            }
+
+            return jsonResult({
+              success: true,
+              type: "check-escalations",
+              count: activeEscalations.length,
+              escalations: activeEscalations,
+              directive:
+                "[NERVOUS_SYSTEM] Read these escalations. If they are rejected decisions, process the feedback and spawn new tasks.",
+            });
+          }
+
+          case "list-project-tasks": {
+            const projectName = params.projectName as string | undefined;
+            if (!projectName) {
+              return jsonResult({ success: false, error: "projectName required" });
+            }
+
+            const tasksDirFiles = await vault.list("tasks/");
+            const projectTasks: Array<{
+              id: string;
+              title: string;
+              status: string;
+              assignee: string | null;
+              createdAt: number;
+              completedAt: number | null;
+            }> = [];
+
+            for (const t of tasksDirFiles) {
+              if (!t.endsWith(".json")) {
+                continue;
+              }
+              const task = await vault
+                .read<{
+                  id: string;
+                  title?: string;
+                  status: string;
+                  assignee?: string | null;
+                  createdAt: number;
+                  completedAt?: number | null;
+                  metadata?: { projectName?: string };
+                }>(`tasks/${t}`)
+                .catch(() => null);
+
+              if (task && task.metadata?.projectName === projectName) {
+                projectTasks.push({
+                  id: task.id,
+                  title: task.title || "Untitled Task",
+                  status: task.status,
+                  assignee: task.assignee || null,
+                  createdAt: task.createdAt || 0,
+                  completedAt: task.completedAt || null,
+                });
+              }
+            }
+
+            return jsonResult({
+              success: true,
+              type: "list-project-tasks",
+              projectName,
+              count: projectTasks.length,
+              tasks: projectTasks,
             });
           }
 

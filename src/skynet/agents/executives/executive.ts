@@ -298,12 +298,17 @@ ${new Date().toISOString()}
     description: string,
     tier: 2 | 3,
   ): Promise<TaskEntry> {
+    const parentTask = await this.vault
+      .read<TaskEntry>(`tasks/${parentTaskId}.json`)
+      .catch(() => null);
+    const projectName = parentTask?.metadata?.projectName || null;
+
     const task: TaskEntry = {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       path: `tasks/task-${Date.now()}.json`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      metadata: {},
+      metadata: { projectName },
       type: "task",
       title,
       description,

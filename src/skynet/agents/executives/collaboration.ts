@@ -119,19 +119,27 @@ export class ExecutiveCollaboration {
       }
     }
 
-    if (totalWeight < 3) {
+    // We expect oversight, monitor, and optimizer to vote, unless they are the requester
+    const expectedVoters = ["oversight", "monitor", "optimizer"].filter(
+      (e) => e !== proposal.requester,
+    ) as ExecutiveRole[];
+    const votesCast = expectedVoters.filter((e) => proposal.votes[e] !== undefined).length;
+
+    // If we haven't reached definitive threshold AND we're still waiting on votes, remain pending
+    if (totalWeight < 3 && votesCast < expectedVoters.length) {
       return false;
     }
 
-    const approvalRatio = approvedWeight / totalWeight;
-    const approved = approvalRatio >= APPROVAL_THRESHOLD;
+    const approvalRatio = totalWeight > 0 ? approvedWeight / totalWeight : 0;
+    const approved = approvalRatio >= APPROVAL_THRESHOLD && totalWeight > 0;
 
     if (approved) {
       proposal.status = "approved";
       proposal.approvedAt = Date.now();
     } else {
       const rejects = executives.filter((e) => proposal.votes[e] === "reject");
-      if (rejects.length >= 2) {
+      // If we failed to get approval and everyone has voted, OR we got 2 definitive rejects, reject it.
+      if (rejects.length >= 2 || votesCast >= expectedVoters.length) {
         proposal.status = "rejected";
         proposal.rejectedAt = Date.now();
       }

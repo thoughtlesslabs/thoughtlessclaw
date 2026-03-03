@@ -138,10 +138,26 @@ ${new Date().toISOString()}
 
   private inferWorkerType(task: TaskEntry): string {
     const combined = `${task.title} ${task.description}`.toLowerCase();
-    if (combined.includes("test") || combined.includes("validate")) return "tester";
-    if (combined.includes("build") || combined.includes("compile")) return "builder";
-    if (combined.includes("report") || combined.includes("write") || combined.includes("document")) return "reporter";
-    if (combined.includes("analyze") || combined.includes("research") || combined.includes("find")) return "analyzer";
+    if (combined.includes("test") || combined.includes("validate")) {
+      return "tester";
+    }
+    if (combined.includes("build") || combined.includes("compile")) {
+      return "builder";
+    }
+    if (
+      combined.includes("report") ||
+      combined.includes("write") ||
+      combined.includes("document")
+    ) {
+      return "reporter";
+    }
+    if (
+      combined.includes("analyze") ||
+      combined.includes("research") ||
+      combined.includes("find")
+    ) {
+      return "analyzer";
+    }
     return "coder";
   }
 
@@ -175,13 +191,15 @@ ${new Date().toISOString()}
     await this.vault.write(`agents/workers/${workerId}.json`, workerState);
 
     // Actually spawn the worker process via gateway tool
-    console.log(`[Manager:${this.managerId}] Spawning real worker ${workerId} for subtask: ${subtask.id}`);
+    console.log(
+      `[Manager:${this.managerId}] Spawning real worker ${workerId} for subtask: ${subtask.id}`,
+    );
     try {
       const { callGatewayTool } = await import("../../../agents/tools/gateway.js");
       const { ensureSkynetModelsJson } = await import("../../../agents/models-config.js");
       const { resolveSkynetAgentDir } = await import("../../../agents/agent-paths.js");
 
-      const config = (globalThis as any).__skynet_config; // Assumes config is available via DI or global 
+      const config = (globalThis as unknown as Record<string, unknown>).__skynet_config; // Assumes config is available via DI or global
       await ensureSkynetModelsJson(config, resolveSkynetAgentDir());
 
       const prompt = `You are a specialist Tier 3 Skynet Worker (${workerType}).
@@ -193,21 +211,25 @@ DESCRIPTION: ${subtask.description}
 
 Review your directives and get to work making progress on this task. When finished, use the DONE: prefix and list ARTIFACTS: logging out your work.`;
 
-      const spawnResult = await callGatewayTool("agent", {}, {
-        sessionKey: `worker:${workerId}`,
-        sessionId: workerId,
-        sessionFile: workerId,
-        messageChannel: "governance",
-        messageProvider: "governance",
-        message: prompt,
-        config,
-        metadata: {
-          taskId: subtask.id,
-          workerType: workerType,
-          spawnedBy: this.managerId,
-          execute: true
-        }
-      });
+      const spawnResult = await callGatewayTool(
+        "agent",
+        {},
+        {
+          sessionKey: `worker:${workerId}`,
+          sessionId: workerId,
+          sessionFile: workerId,
+          messageChannel: "governance",
+          messageProvider: "governance",
+          message: prompt,
+          config,
+          metadata: {
+            taskId: subtask.id,
+            workerType: workerType,
+            spawnedBy: this.managerId,
+            execute: true,
+          },
+        },
+      );
 
       console.log(`[Manager:${this.managerId}] Worker ${workerId} spawn result:`, spawnResult);
     } catch (err) {
@@ -270,7 +292,7 @@ Review your directives and get to work making progress on this task. When finish
         path: `tasks/subtask-${Date.now()}-${i}.json`,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        metadata: {},
+        metadata: { projectName: parentTask.metadata?.projectName || null },
         type: "task",
         title: `${parentTask.title} (Part ${i + 1})`,
         description: `Subtask ${i + 1} of: ${parentTask.description}`,
