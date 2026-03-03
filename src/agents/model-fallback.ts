@@ -381,7 +381,10 @@ async function decrementActiveModelCalls(provider: string, model: string): Promi
   });
 }
 
-function resolveAgentTier(agentDir?: string): number {
+function resolveAgentTier(agentDir?: string, tierOverride?: number): number {
+  if (tierOverride !== undefined) {
+    return tierOverride;
+  }
   if (!agentDir) {
     return 3; // Default to Tier 3 (worker-level) if unknown
   }
@@ -406,9 +409,15 @@ async function isModelSaturated(
   provider: string,
   model: string,
   agentDir?: string,
+  tierOverride?: number,
 ): Promise<boolean> {
   const active = await getActiveModelCalls(provider, model);
-  const tier = resolveAgentTier(agentDir);
+  const tier = resolveAgentTier(agentDir, tierOverride);
+
+  if (tier === 0) {
+    // Tier 0 is exempt from concurrency limits (e.g. human interactive Telegram)
+    return false;
+  }
 
   if (tier === 1) {
     // Executives share generously (>= 3 concurrent)
@@ -425,6 +434,7 @@ export async function runWithModelFallback<T>(params: {
   provider: string;
   model: string;
   agentDir?: string;
+  tierOverride?: number;
   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
   fallbacksOverride?: string[];
   run: (provider: string, model: string) => Promise<T>;
@@ -509,7 +519,14 @@ export async function runWithModelFallback<T>(params: {
     }
 
     if (hasFallbackCandidates) {
-      if (await isModelSaturated(candidate.provider, candidate.model, params.agentDir)) {
+      if (
+        await isModelSaturated(
+          candidate.provider,
+          candidate.model,
+          params.agentDir,
+          params.tierOverride,
+        )
+      ) {
         attempts.push({
           provider: candidate.provider,
           model: candidate.model,
