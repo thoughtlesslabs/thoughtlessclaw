@@ -2138,26 +2138,8 @@ The Interceptor will catch your trigger line and handle everything automatically
             if (!escalationId || !decision) {
               return jsonResult({ success: false, error: "escalationId and decision required" });
             }
-            const decisionId = `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            const decisionEntry = {
-              id: decisionId,
-              path: `decisions/${decisionId}.json`,
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              metadata: {},
-              type: "escalation_decision",
-              originalEscalationId: escalationId,
-              escalationPath: ["worker", "manager", "executive", "user"],
-              question,
-              proposedSolution,
-              decision,
-              decidedBy: "user",
-              decidedAt: Date.now(),
-              status: "pending_propagation",
-            };
-            await vault.write(`decisions/${decisionId}.json`, decisionEntry);
-
-            // Mark the original escalation as processed
+            // Fetch original escalation to determine sender and mark as processed
+            let finalEscalationPath = ["system", "main", "user"];
             try {
               const originalEvent = await vault.read<{
                 id: string;
@@ -2167,9 +2149,13 @@ The Interceptor will catch your trigger line and handle everything automatically
                 metadata: Record<string, unknown>;
                 type: "event";
                 status?: string;
+                sender?: string;
                 [key: string]: unknown;
               }>(`events/${escalationId}.json`);
               if (originalEvent) {
+                if (originalEvent.sender) {
+                  finalEscalationPath = [originalEvent.sender, "main", "user"];
+                }
                 originalEvent.status = "processed";
                 originalEvent.updatedAt = Date.now();
                 await vault.write(`events/${escalationId}.json`, originalEvent);
@@ -2177,6 +2163,25 @@ The Interceptor will catch your trigger line and handle everything automatically
             } catch (err) {
               console.error(`Failed to mark escalation ${escalationId} as processed:`, err);
             }
+
+            const decisionId = `decision-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const decisionEntry = {
+              id: decisionId,
+              path: `decisions/${decisionId}.json`,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              metadata: {},
+              type: "escalation_decision",
+              originalEscalationId: escalationId,
+              escalationPath: finalEscalationPath,
+              question,
+              proposedSolution,
+              decision,
+              decidedBy: "user",
+              decidedAt: Date.now(),
+              status: "pending_propagation",
+            };
+            await vault.write(`decisions/${decisionId}.json`, decisionEntry);
 
             return jsonResult({ success: true, type: "decision-created", decisionId, decision });
           }
