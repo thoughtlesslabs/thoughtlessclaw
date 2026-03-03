@@ -7,12 +7,15 @@ import {
 import { ensureWorkerConfigFromMain } from "../../agents/config-provision.js";
 import { spawnSubagentDirect } from "../../agents/subagent-spawn.js";
 import { callGateway } from "../../gateway/call.js";
-import { WORKER_CONFIGS, createWorkerAgent, type WorkerType } from "../../skynet/agents/workers/worker.js";
-import { createProjectManager } from "../../skynet/agents/managers/project-manager.js";
-import { getPatternLearner } from "../../skynet/learning/pattern-learner.js";
-import { ExecutiveCollaboration, createExecutiveCollaboration } from "../../skynet/agents/executives/collaboration.js";
-import { getPriorityBoard } from "../../skynet/governance/priority-board.js";
 import { requestHeartbeatNow } from "../../infra/heartbeat-wake.js";
+import {
+  ExecutiveCollaboration,
+  createExecutiveCollaboration,
+} from "../../skynet/agents/executives/collaboration.js";
+import { createProjectManager } from "../../skynet/agents/managers/project-manager.js";
+import { WORKER_CONFIGS, createWorkerAgent } from "../../skynet/agents/workers/worker.js";
+import { getPriorityBoard } from "../../skynet/governance/priority-board.js";
+import { getPatternLearner } from "../../skynet/learning/pattern-learner.js";
 import { createVaultManager } from "../../skynet/vault/manager.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult } from "./common.js";
@@ -263,7 +266,7 @@ export function createGovernanceTool(): AnyAgentTool {
             }
 
             // 2. Get active blockers from all projects
-            let activeBlockers = [];
+            let activeBlockers: string[] = [];
             let totalWorkers = 0;
             let totalTasks = 0;
             let pendingTasks = 0;
@@ -313,10 +316,11 @@ ${modelsHealth}
 - **Task Backlog:** ${pendingTasks} pending / ${totalTasks} total tasks
 
 ## Global Blockers
-${activeBlockers.length > 0
-                ? activeBlockers.map((b) => `- ${b}`).join("\n")
-                : "✅ No active blockers reported by Project Managers."
-              }
+${
+  activeBlockers.length > 0
+    ? activeBlockers.map((b) => `- ${b}`).join("\n")
+    : "✅ No active blockers reported by Project Managers."
+}
 `;
             return jsonResult({ success: true, type: "health-summary", report: dashboard });
           }
@@ -422,7 +426,7 @@ ${activeBlockers.length > 0
               true,
             );
 
-            const worker = createWorkerAgent(vault, workerType as WorkerType);
+            const worker = createWorkerAgent(vault, workerType);
             const workerId = worker.getWorkerId();
 
             // Determine task id
@@ -809,7 +813,7 @@ The Interceptor will catch your trigger line and handle everything automatically
 
             try {
               requestHeartbeatNow({ reason: "manager-escalation", agentId: "main" });
-            } catch { }
+            } catch {}
 
             return jsonResult({
               success: true,
@@ -1649,7 +1653,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                   // Clean up the dead worker state record
                   if (prevAssignee && prevAssignee.startsWith("worker-")) {
                     const existingWorkerPath = `projects/${projectName}/workers/${prevAssignee}.json`;
-                    await vault.delete(existingWorkerPath).catch(() => { });
+                    await vault.delete(existingWorkerPath).catch(() => {});
                   }
 
                   // Adjust our local copies so we don't try to sync the dead worker
@@ -1990,23 +1994,23 @@ The Interceptor will catch your trigger line and handle everything automatically
                 const task = vault.read(t).catch(() => null);
                 return task && task.then
                   ? task.then((t: unknown) => {
-                    if (!t || typeof t !== "object" || !("status" in t)) {
-                      return false;
-                    }
-                    if (t.status !== "pending") {
-                      return false;
-                    }
-                    // Count it as pending if it's assigned to any valid manager format
-                    const assignee =
-                      "assignee" in t && typeof t.assignee === "string" ? t.assignee : "";
-                    return (
-                      assignee.startsWith("manager-") ||
-                      ("metadata" in t &&
-                        typeof t.metadata === "object" &&
-                        t.metadata &&
-                        "projectName" in t.metadata)
-                    );
-                  })
+                      if (!t || typeof t !== "object" || !("status" in t)) {
+                        return false;
+                      }
+                      if (t.status !== "pending") {
+                        return false;
+                      }
+                      // Count it as pending if it's assigned to any valid manager format
+                      const assignee =
+                        "assignee" in t && typeof t.assignee === "string" ? t.assignee : "";
+                      return (
+                        assignee.startsWith("manager-") ||
+                        ("metadata" in t &&
+                          typeof t.metadata === "object" &&
+                          t.metadata &&
+                          "projectName" in t.metadata)
+                      );
+                    })
                   : false;
               }).length,
               timestamp: Date.now(),

@@ -1,10 +1,17 @@
 #!/usr/bin/env node
+import { loadConfig } from "../src/config/config.js";
 import { createSkynet, createInboxServer } from "../src/skynet/index.js";
 
 export async function skynetMain() {
   console.log("[Skynet] Starting autonomous OS...");
 
+  const cfg = loadConfig();
+  if (cfg.gateway?.auth?.token) {
+    process.env.SKYNET_GATEWAY_TOKEN = cfg.gateway.auth.token;
+  }
+
   const port = parseInt(process.env.SKYNET_API_PORT || "18790");
+
   const heartbeatMs = parseInt(process.env.SKYNET_HEARTBEAT_MS || "60000");
   const idleMs = parseInt(process.env.SKYNET_IDLE_MS || "300000");
   const tokenBudget = parseInt(process.env.SKYNET_TOKEN_BUDGET || "1000000");

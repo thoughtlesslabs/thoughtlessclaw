@@ -342,7 +342,6 @@ export class TickHandlerRegistry {
                 message: `DORMANT-CHECK: You have received an automated watchdog ping from the Nervous System. 1. Run governance(poll-events) to check for pending escalations, decisions, or Nervous System events addressed to you. 2. If escalation events exist: respond using governance(create-decision) with your decision, then governance(propagate-decision) to route it back. 3. If tasks exist in your Vault project: continue working and output DONE:, ERRORS:, or BLOCKER: when appropriate. 4. If nothing is pending: reply HEARTBEAT_OK.`,
                 idempotencyKey: `wake-executive-${exec}-${Date.now()}`,
                 label: `Executive: ${exec}`,
-                channel: "governance",
               },
               timeoutMs: 30000,
             });
