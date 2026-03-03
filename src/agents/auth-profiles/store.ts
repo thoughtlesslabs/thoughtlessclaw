@@ -252,10 +252,14 @@ export function loadAuthProfileStore(): AuthProfileStore {
 }
 
 function loadAuthProfileStoreForAgent(
-  agentDir?: string,
+  _agentDir?: string,
   _options?: { allowKeychainPrompt?: boolean },
 ): AuthProfileStore {
-  const authPath = resolveAuthStorePath(agentDir);
+  // Always load from the central ("main") agent directory to ensure global
+  // rate-limits and usage stats are properly shared across all workers.
+  // This inherently ignores any legacy `auth-profiles.json` files that may
+  // have been cloned into individual worker directories in the past.
+  const authPath = resolveAuthStorePath(undefined);
   const raw = loadJsonFile(authPath);
   const asStore = coerceAuthStore(raw);
   if (asStore) {
@@ -267,20 +271,7 @@ function loadAuthProfileStoreForAgent(
     return asStore;
   }
 
-  // Fallback: inherit auth-profiles from main agent if subagent has none
-  if (agentDir) {
-    const mainAuthPath = resolveAuthStorePath(); // without agentDir = main
-    const mainRaw = loadJsonFile(mainAuthPath);
-    const mainStore = coerceAuthStore(mainRaw);
-    if (mainStore && Object.keys(mainStore.profiles).length > 0) {
-      // Clone main store to subagent directory for auth inheritance
-      saveJsonFile(authPath, mainStore);
-      log.info("inherited auth-profiles from main agent", { agentDir });
-      return mainStore;
-    }
-  }
-
-  const legacyRaw = loadJsonFile(resolveLegacyAuthStorePath(agentDir));
+  const legacyRaw = loadJsonFile(resolveLegacyAuthStorePath(undefined));
   const legacy = coerceLegacyStore(legacyRaw);
   const store: AuthProfileStore = {
     version: AUTH_STORE_VERSION,
@@ -301,7 +292,7 @@ function loadAuthProfileStoreForAgent(
   // overwriting fresh OAuth creds with stale tokens (fixes #363). Delete only
   // after we've successfully written auth-profiles.json.
   if (shouldWrite && legacy !== null) {
-    const legacyPath = resolveLegacyAuthStorePath(agentDir);
+    const legacyPath = resolveLegacyAuthStorePath(undefined);
     try {
       fs.unlinkSync(legacyPath);
     } catch (err) {

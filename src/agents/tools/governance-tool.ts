@@ -521,6 +521,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 {
                   task: taskPrompt,
                   agentId: workerAgentAlias,
+                  model: workerConfig?.defaultModelPreference,
                   mode: "run",
                   label: `${projectName}-${workerType}`,
                   runTimeoutSeconds: 600,

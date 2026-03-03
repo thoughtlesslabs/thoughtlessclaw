@@ -1,8 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { SkynetConfig } from "../config/config.js";
 import {
   resolveAgentModelFallbackValues,
   resolveAgentModelPrimaryValue,
 } from "../config/model-input.js";
+import { withFileLock } from "../infra/file-lock.js";
+import { loadJsonFile, saveJsonFile } from "../infra/json-file.js";
+import { resolveUserPath } from "../utils.js";
 import {
   ensureAuthProfileStore,
   getSoonestCooldownExpiry,
@@ -170,7 +175,7 @@ function resolveImageFallbackCandidates(params: {
   return candidates;
 }
 
-export let _learnedFallbackPref: { provider: string; model: string } | null = null;
+export const _learnedFallbackPrefs: Record<string, { provider: string; model: string }> = {};
 
 function resolveFallbackCandidates(params: {
   cfg: SkynetConfig | undefined;
@@ -204,8 +209,19 @@ function resolveFallbackCandidates(params: {
 
   addCandidate(normalizedPrimary, false);
 
-  if (_learnedFallbackPref) {
-    addCandidate(_learnedFallbackPref, true);
+  const primaryKey = `${normalizedPrimary.provider}::${normalizedPrimary.model}`;
+  let learnedFallbackPref = _learnedFallbackPrefs[primaryKey];
+  try {
+    const limits = loadJsonFile(resolveRateLimitsPath()) as GlobalRateLimits;
+    if (limits?.learnedFallbackPrefs?.[primaryKey] !== undefined) {
+      learnedFallbackPref = limits.learnedFallbackPrefs[primaryKey];
+    }
+  } catch {
+    // Ignore read errors
+  }
+
+  if (learnedFallbackPref) {
+    addCandidate(learnedFallbackPref, true);
   }
 
   const modelFallbacks = (() => {
@@ -239,30 +255,74 @@ function resolveFallbackCandidates(params: {
   return candidates;
 }
 
-const lastProbeAttempt = new Map<string, number>();
+const RATE_LIMITS_LOCK_OPTIONS = {
+  wait: 15_000,
+  stale: 60_000,
+  retries: {
+    retries: 50,
+    factor: 2,
+    minTimeout: 100,
+    maxTimeout: 1000,
+  },
+};
+
 const MIN_PROBE_INTERVAL_MS = 30_000; // 30 seconds between probes per key
 const PROBE_MARGIN_MS = 2 * 60 * 1000;
-const PROBE_SCOPE_DELIMITER = "::";
 
-function resolveProbeThrottleKey(provider: string, agentDir?: string): string {
-  const scope = String(agentDir ?? "").trim();
-  return scope ? `${scope}${PROBE_SCOPE_DELIMITER}${provider}` : provider;
+function resolveProbeThrottleKey(provider: string): string {
+  return provider;
 }
 
-function shouldProbePrimaryDuringCooldown(params: {
+function resolveRateLimitsPath(): string {
+  return resolveUserPath("~/.skynet/vault/projects/shared/rate-limits.json");
+}
+
+type GlobalRateLimits = {
+  activeModelCalls: Record<string, number>;
+  lastProbeAttempt: Record<string, number>;
+  learnedFallbackPrefs?: Record<string, { provider: string; model: string }>;
+};
+
+function ensureRateLimitsFile(pathname: string) {
+  if (fs.existsSync(pathname)) {
+    return;
+  }
+  const dir = path.dirname(pathname);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  saveJsonFile(pathname, { activeModelCalls: {}, lastProbeAttempt: {} });
+}
+
+async function updateRateLimitsWithLock<T>(updater: (limits: GlobalRateLimits) => T): Promise<T> {
+  const limitsPath = resolveRateLimitsPath();
+  ensureRateLimitsFile(limitsPath);
+  return await withFileLock(limitsPath, RATE_LIMITS_LOCK_OPTIONS, async () => {
+    const data = (loadJsonFile(limitsPath) ?? {
+      activeModelCalls: {},
+      lastProbeAttempt: {},
+    }) as GlobalRateLimits;
+    if (!data.activeModelCalls) {
+      data.activeModelCalls = {};
+    }
+    if (!data.lastProbeAttempt) {
+      data.lastProbeAttempt = {};
+    }
+    const result = updater(data);
+    saveJsonFile(limitsPath, data);
+    return result;
+  });
+}
+
+async function shouldProbePrimaryDuringCooldown(params: {
   isPrimary: boolean;
   hasFallbackCandidates: boolean;
   now: number;
   throttleKey: string;
   authStore: ReturnType<typeof ensureAuthProfileStore>;
   profileIds: string[];
-}): boolean {
+}): Promise<boolean> {
   if (!params.isPrimary || !params.hasFallbackCandidates) {
-    return false;
-  }
-
-  const lastProbe = lastProbeAttempt.get(params.throttleKey) ?? 0;
-  if (params.now - lastProbe < MIN_PROBE_INTERVAL_MS) {
     return false;
   }
 
@@ -271,40 +331,54 @@ function shouldProbePrimaryDuringCooldown(params: {
     return true;
   }
 
-  // Probe when cooldown already expired or within the configured margin.
-  return params.now >= soonest - PROBE_MARGIN_MS;
+  if (params.now < soonest - PROBE_MARGIN_MS) {
+    return false;
+  }
+
+  return await updateRateLimitsWithLock((limits) => {
+    const lastProbe = limits.lastProbeAttempt[params.throttleKey] ?? 0;
+    if (params.now - lastProbe < MIN_PROBE_INTERVAL_MS) {
+      return false;
+    }
+    limits.lastProbeAttempt[params.throttleKey] = params.now;
+    return true;
+  });
 }
 
 /** @internal – exposed for unit tests only */
 export const _probeThrottleInternals = {
-  lastProbeAttempt,
   MIN_PROBE_INTERVAL_MS,
   PROBE_MARGIN_MS,
   resolveProbeThrottleKey,
+  resolveRateLimitsPath,
 } as const;
 
 // --- HIERARCHICAL CONCURRENCY LIMITS ---
 // Prevents "thundering herd" on fallback models by distributing load across the fallback chain
 
-const activeModelCalls = new Map<string, number>();
-
-function getActiveModelCalls(provider: string, model: string): number {
-  return activeModelCalls.get(`${provider}::${model}`) ?? 0;
+async function getActiveModelCalls(provider: string, model: string): Promise<number> {
+  return await updateRateLimitsWithLock((limits) => {
+    return limits.activeModelCalls[`${provider}::${model}`] ?? 0;
+  });
 }
 
-function incrementActiveModelCalls(provider: string, model: string): void {
+async function incrementActiveModelCalls(provider: string, model: string): Promise<void> {
   const key = `${provider}::${model}`;
-  activeModelCalls.set(key, (activeModelCalls.get(key) ?? 0) + 1);
+  await updateRateLimitsWithLock((limits) => {
+    limits.activeModelCalls[key] = (limits.activeModelCalls[key] ?? 0) + 1;
+  });
 }
 
-function decrementActiveModelCalls(provider: string, model: string): void {
+async function decrementActiveModelCalls(provider: string, model: string): Promise<void> {
   const key = `${provider}::${model}`;
-  const current = activeModelCalls.get(key) ?? 0;
-  if (current <= 1) {
-    activeModelCalls.delete(key);
-  } else {
-    activeModelCalls.set(key, current - 1);
-  }
+  await updateRateLimitsWithLock((limits) => {
+    const current = limits.activeModelCalls[key] ?? 0;
+    if (current <= 1) {
+      delete limits.activeModelCalls[key];
+    } else {
+      limits.activeModelCalls[key] = current - 1;
+    }
+  });
 }
 
 function resolveAgentTier(agentDir?: string): number {
@@ -328,8 +402,12 @@ function resolveAgentTier(agentDir?: string): number {
   return 3;
 }
 
-function isModelSaturated(provider: string, model: string, agentDir?: string): boolean {
-  const active = getActiveModelCalls(provider, model);
+async function isModelSaturated(
+  provider: string,
+  model: string,
+  agentDir?: string,
+): Promise<boolean> {
+  const active = await getActiveModelCalls(provider, model);
   const tier = resolveAgentTier(agentDir);
 
   if (tier === 1) {
@@ -383,7 +461,6 @@ export async function runWithModelFallback<T>(params: {
         const allowed = await tryCheckoutProfile({
           store: authStore,
           profileId: id,
-          agentDir: params.agentDir,
         });
         if (allowed) {
           isAnyProfileAvailable = true;
@@ -397,8 +474,8 @@ export async function runWithModelFallback<T>(params: {
         // expiry is close or already past. This avoids staying on a fallback
         // model long after the real rate-limit window clears.
         const now = Date.now();
-        const probeThrottleKey = resolveProbeThrottleKey(candidate.provider, params.agentDir);
-        const shouldProbe = shouldProbePrimaryDuringCooldown({
+        const probeThrottleKey = resolveProbeThrottleKey(candidate.provider);
+        const shouldProbe = await shouldProbePrimaryDuringCooldown({
           isPrimary: i === 0,
           hasFallbackCandidates,
           now,
@@ -425,12 +502,14 @@ export async function runWithModelFallback<T>(params: {
         // Primary model probe: attempt it despite cooldown to detect recovery.
         // If it fails, the error is caught below and we fall through to the
         // next candidate as usual.
-        lastProbeAttempt.set(probeThrottleKey, now);
+        await updateRateLimitsWithLock((limits) => {
+          limits.lastProbeAttempt[probeThrottleKey] = now;
+        });
       }
     }
 
     if (hasFallbackCandidates) {
-      if (isModelSaturated(candidate.provider, candidate.model, params.agentDir)) {
+      if (await isModelSaturated(candidate.provider, candidate.model, params.agentDir)) {
         attempts.push({
           provider: candidate.provider,
           model: candidate.model,
@@ -442,14 +521,29 @@ export async function runWithModelFallback<T>(params: {
     }
 
     try {
-      incrementActiveModelCalls(candidate.provider, candidate.model);
+      await incrementActiveModelCalls(candidate.provider, candidate.model);
       const result = await params.run(candidate.provider, candidate.model);
+      const primaryKey = `${params.provider}::${params.model}`;
       if (i > 0) {
         // Record successful fallback to accelerate future failovers
-        _learnedFallbackPref = { provider: candidate.provider, model: candidate.model };
+        _learnedFallbackPrefs[primaryKey] = {
+          provider: candidate.provider,
+          model: candidate.model,
+        };
+        updateRateLimitsWithLock((limits) => {
+          if (!limits.learnedFallbackPrefs) {
+            limits.learnedFallbackPrefs = {};
+          }
+          limits.learnedFallbackPrefs[primaryKey] = _learnedFallbackPrefs[primaryKey];
+        }).catch(() => {});
       } else if (i === 0) {
         // Clear learned preference once primary model recovers
-        _learnedFallbackPref = null;
+        delete _learnedFallbackPrefs[primaryKey];
+        updateRateLimitsWithLock((limits) => {
+          if (limits.learnedFallbackPrefs) {
+            delete limits.learnedFallbackPrefs[primaryKey];
+          }
+        }).catch(() => {});
       }
       return {
         result,
@@ -496,7 +590,7 @@ export async function runWithModelFallback<T>(params: {
         total: candidates.length,
       });
     } finally {
-      decrementActiveModelCalls(candidate.provider, candidate.model);
+      await decrementActiveModelCalls(candidate.provider, candidate.model);
     }
   }
 
@@ -536,7 +630,7 @@ export async function runWithImageModelFallback<T>(params: {
     const candidate = candidates[i];
 
     if (candidates.length > 1) {
-      if (isModelSaturated(candidate.provider, candidate.model, undefined)) {
+      if (await isModelSaturated(candidate.provider, candidate.model, undefined)) {
         attempts.push({
           provider: candidate.provider,
           model: candidate.model,
@@ -548,7 +642,7 @@ export async function runWithImageModelFallback<T>(params: {
     }
 
     try {
-      incrementActiveModelCalls(candidate.provider, candidate.model);
+      await incrementActiveModelCalls(candidate.provider, candidate.model);
       const result = await params.run(candidate.provider, candidate.model);
       return {
         result,
@@ -574,7 +668,7 @@ export async function runWithImageModelFallback<T>(params: {
         total: candidates.length,
       });
     } finally {
-      decrementActiveModelCalls(candidate.provider, candidate.model);
+      await decrementActiveModelCalls(candidate.provider, candidate.model);
     }
   }
 

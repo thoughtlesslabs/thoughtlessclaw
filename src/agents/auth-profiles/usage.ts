@@ -55,10 +55,9 @@ export function isProfileInCooldown(store: AuthProfileStore, profileId: string):
 export async function tryCheckoutProfile(params: {
   store: AuthProfileStore;
   profileId: string;
-  agentDir?: string;
   now?: number;
 }): Promise<boolean> {
-  const { store, profileId, agentDir } = params;
+  const { store, profileId } = params;
   const now = params.now ?? Date.now();
 
   // 1. Fast path: if still in strict time cooldown, reject immediately without lock
@@ -69,7 +68,7 @@ export async function tryCheckoutProfile(params: {
   // 2. Lock & update step: safely clear expired cooldowns and/or decrement half-open tokens.
   let allowed = true;
   const updated = await updateAuthProfileStoreWithLock({
-    agentDir,
+    agentDir: undefined,
     updater: (freshStore) => {
       clearExpiredCooldowns(freshStore, now);
 
@@ -299,9 +298,9 @@ export async function markAuthProfileUsed(params: {
   profileId: string;
   agentDir?: string;
 }): Promise<void> {
-  const { store, profileId, agentDir } = params;
+  const { store, profileId } = params;
   const updated = await updateAuthProfileStoreWithLock({
-    agentDir,
+    agentDir: undefined,
     updater: (freshStore) => {
       if (!freshStore.profiles[profileId]) {
         return false;
@@ -341,7 +340,7 @@ export async function markAuthProfileUsed(params: {
     halfOpenActive: false,
     halfOpenTokens: undefined,
   };
-  saveAuthProfileStore(store, agentDir);
+  saveAuthProfileStore(store, undefined);
 }
 
 export function calculateAuthProfileCooldownMs(errorCount: number): number {
@@ -504,9 +503,9 @@ export async function markAuthProfileFailure(params: {
   cfg?: SkynetConfig;
   agentDir?: string;
 }): Promise<void> {
-  const { store, profileId, reason, agentDir, cfg } = params;
+  const { store, profileId, reason, cfg } = params;
   const updated = await updateAuthProfileStoreWithLock({
-    agentDir,
+    agentDir: undefined,
     updater: (freshStore) => {
       const profile = freshStore.profiles[profileId];
       if (!profile) {
@@ -554,7 +553,7 @@ export async function markAuthProfileFailure(params: {
     reason,
     cfgResolved,
   });
-  saveAuthProfileStore(store, agentDir);
+  saveAuthProfileStore(store, undefined);
 }
 
 /**
@@ -571,7 +570,7 @@ export async function markAuthProfileCooldown(params: {
     store: params.store,
     profileId: params.profileId,
     reason: "unknown",
-    agentDir: params.agentDir,
+    agentDir: undefined,
   });
 }
 
