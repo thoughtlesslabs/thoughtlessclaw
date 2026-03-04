@@ -1,13 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { resolveUserPath } from "../utils.js";
+import { resolveDefaultAgentWorkspaceDir } from "./workspace.js";
 
 export async function ensureAgentConfigFromMain(agentId: string): Promise<void> {
-  const mainAgentDir = resolveUserPath("~/.skynet/agents/main/agent");
+  const mainAgentDir = resolveDefaultAgentWorkspaceDir();
   // Normalize agentId: replace colons with hyphens for filesystem paths
   // e.g., "manager:opportunity" → "manager-opportunity"
   const normalizedAgentId = agentId.replace(/:/g, "-");
-  const targetAgentDir = resolveUserPath(`~/.skynet/agents/${normalizedAgentId}/agent`);
+  const targetAgentDir = path.join(path.dirname(mainAgentDir), normalizedAgentId);
 
   // Check if main's config exists
   try {

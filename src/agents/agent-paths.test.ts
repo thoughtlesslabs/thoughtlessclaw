@@ -25,7 +25,7 @@ describe("resolveSkynetAgentDir", () => {
         },
         () => {
           const resolved = resolveSkynetAgentDir();
-          expect(resolved).toBe(path.join(stateDir, "agents", "main", "agent"));
+          expect(resolved).toBe(path.join(os.homedir(), ".skynet", "vault", "agents", "main"));
         },
       );
     });
