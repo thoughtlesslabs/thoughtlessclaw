@@ -378,9 +378,14 @@ function resolveAgentTier(agentDir?: string, tierOverride?: number): number {
   if (!agentDir) {
     return 3; // Default to Tier 3 (worker-level) if unknown
   }
-  // Tier 1: Main, Oversight, Monitor, Optimizer
+
+  // Tier 0: The primary user-facing executive. Exempt from synthetic concurrency limits.
+  if (agentDir.endsWith("/agents/main") || agentDir.includes("/agents/main-")) {
+    return 0; // Exempt from concurrency limits
+  }
+
+  // Tier 1: Oversight, Monitor, Optimizer
   if (
-    agentDir.includes("/agents/main") ||
     agentDir.includes("/agents/oversight") ||
     agentDir.includes("/agents/monitor") ||
     agentDir.includes("/agents/optimizer")
