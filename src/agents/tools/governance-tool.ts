@@ -20,6 +20,28 @@ import { createVaultManager } from "../../skynet/vault/manager.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult } from "./common.js";
 
+// Types for manager plan workflow
+interface ManagerPlanVote {
+  vote: "approve" | "reject" | "feedback";
+  feedback: string;
+  votedAt: number;
+}
+
+interface ManagerPlan extends Record<string, unknown> {
+  id: string;
+  path: string;
+  projectName: string;
+  createdAt: number;
+  updatedAt: number;
+  submittedAt: number;
+  submittedBy: string;
+  version: number;
+  status: "pending-review" | "approved" | "rejected" | "needs-revision";
+  description: string;
+  votes: Record<string, ManagerPlanVote>;
+  type: "manager-plan";
+}
+
 // Permission types for agent protocol enforcement
 const PERMISSION_TYPES = {
   // File operations
@@ -131,6 +153,8 @@ const GovernanceConsultSchema = Type.Object({
     Type.Literal("ask-executive"),
     Type.Literal("check-escalations"),
     Type.Literal("list-project-tasks"),
+    Type.Literal("submit-plan"),
+    Type.Literal("evaluate-plan"),
   ]),
   request: Type.Optional(Type.String()),
   plan: Type.Optional(Type.String()),
@@ -390,7 +414,7 @@ ${
             const approvalCheck = await patternLearner.checkAutoApprove(
               projectName,
               "spawn-worker",
-              { workerType, taskDescription },
+              { workerType }, // stable: workerType is consistent per project; taskDescription varies
             );
 
             if (approvalCheck.confidence < 60) {
@@ -414,6 +438,37 @@ ${
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
+
+              // Create proposal markdown for Triad to evaluate
+              const proposalMd = `# Escalation Proposal: Spawn Worker
+
+**Escalation ID:** ${escalationId}
+**Project:** ${projectName}
+**Requested At:** ${new Date().toISOString()}
+
+## Request
+Spawn a worker with the following configuration:
+
+- **Worker Type:** ${workerType}
+- **Task Description:** ${taskDescription}
+- **Project:** ${projectName}
+
+## Question for Executives
+Should we approve spawning a ${workerType} worker for this task?
+
+## Voting
+- **Oversight:** [ ] Approve [ ] Reject [ ] Abstain
+- **Monitor:** [ ] Approve [ ] Reject [ ] Abstain
+- **Optimizer:** [ ] Approve [ ] Reject [ ] Abstain
+
+---
+
+**System Note:** This proposal was auto-generated from an escalation. Executives should review and vote.`;
+
+              const proposalPath = `proposals/${escalationId}.md`;
+              // @ts-expect-error Writing markdown proposal
+              await vault.write(proposalPath, proposalMd as unknown);
+
               // Immediately wake the executive agents so the escalation is not silently pending
               try {
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
@@ -427,14 +482,14 @@ ${
                 success: false,
                 error:
                   "Action requires executive approval. An escalation has been automatically filed.",
-                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Hibernate and await response.`,
+                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Proposal: proposals/${escalationId}.md. Hibernate and await response.`,
               });
             }
             await patternLearner.recordApproval(
               approvalCheck.computedHash,
               projectName,
               "spawn-worker",
-              { workerType, taskDescription },
+              { workerType }, // stable params — matches checkAutoApprove hash
               true,
             );
 
@@ -651,6 +706,36 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
+
+              // Create proposal markdown for Triad to evaluate
+              const proposalMd = `# Escalation Proposal: Hire Manager
+
+**Escalation ID:** ${escalationId}
+**Project:** ${projectName}
+**Requested At:** ${new Date().toISOString()}
+
+## Request
+Hire a manager for the following project:
+
+- **Project Name:** ${projectName}
+- **Description:** ${description}
+
+## Question for Executives
+Should we approve hiring a manager for the ${projectName} project?
+
+## Voting
+- **Oversight:** [ ] Approve [ ] Reject [ ] Abstain
+- **Monitor:** [ ] Approve [ ] Reject [ ] Abstain
+- **Optimizer:** [ ] Approve [ ] Reject [ ] Abstain
+
+---
+
+**System Note:** This proposal was auto-generated from an escalation. Executives should review and vote.`;
+
+              const proposalPath = `proposals/${escalationId}.md`;
+              // @ts-expect-error Writing markdown proposal
+              await vault.write(proposalPath, proposalMd as unknown);
+
               // Immediately wake the executive agents so the escalation is not silently pending
               try {
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
@@ -664,7 +749,7 @@ The Interceptor will catch your trigger line and handle everything automatically
                 success: false,
                 error:
                   "Action requires executive approval. An escalation has been automatically filed.",
-                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Hibernate and await response.`,
+                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Proposal: proposals/${escalationId}.md. Hibernate and await response.`,
               });
             }
             // Record successful execution of approved pattern
@@ -1122,7 +1207,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const approvalCheck = await patternLearner.checkAutoApprove(
               rLProjectName,
               "create-task",
-              { title, description, assignee, priority },
+              {}, // stable: title/description vary per task; key only on project identity
             );
 
             if (approvalCheck.confidence < 60) {
@@ -1146,6 +1231,38 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
+
+              // Create proposal markdown for Triad to evaluate
+              const proposalMd = `# Escalation Proposal: Create Task
+
+**Escalation ID:** ${escalationId}
+**Project:** ${rLProjectName}
+**Requested At:** ${new Date().toISOString()}
+
+## Request
+Create a new task with the following details:
+
+- **Title:** ${title}
+- **Description:** ${description}
+- **Assignee:** ${assignee || "Manager"}
+- **Priority:** ${priority || "normal"}
+
+## Question for Executives
+Should we approve this task creation?
+
+## Voting
+- **Oversight:** [ ] Approve [ ] Reject [ ] Abstain
+- **Monitor:** [ ] Approve [ ] Reject [ ] Abstain
+- **Optimizer:** [ ] Approve [ ] Reject [ ] Abstain
+
+---
+
+**System Note:** This proposal was auto-generated from an escalation. Executives should review and vote.`;
+
+              const proposalPath = `proposals/${escalationId}.md`;
+              // @ts-expect-error Writing markdown proposal
+              await vault.write(proposalPath, proposalMd as unknown);
+
               // Immediately wake the executive agents so the escalation is not silently pending
               try {
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
@@ -1159,14 +1276,14 @@ The Interceptor will catch your trigger line and handle everything automatically
                 success: false,
                 error:
                   "Action requires executive approval. An escalation has been automatically filed.",
-                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Hibernate and await response.`,
+                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Proposal: proposals/${escalationId}.md. Hibernate and await response.`,
               });
             }
             await patternLearner.recordApproval(
               approvalCheck.computedHash,
               rLProjectName,
               "create-task",
-              { title, description, assignee, priority },
+              {}, // stable params — matches checkAutoApprove hash
               true,
             );
 
@@ -1238,7 +1355,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const approvalCheck = await patternLearner.checkAutoApprove(
               projectName,
               "assign-task",
-              { taskId },
+              {}, // stable: taskId is unique per call; key only on project identity
             );
 
             if (approvalCheck.confidence < 60) {
@@ -1262,6 +1379,37 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
+
+              // Create proposal markdown for Triad to evaluate
+              const proposalMd = `# Escalation Proposal: Assign Task
+
+**Escalation ID:** ${escalationId}
+**Project:** ${projectName}
+**Task ID:** ${taskId}
+**Requested At:** ${new Date().toISOString()}
+
+## Request
+Assign the following task to the specified project:
+
+- **Task ID:** ${taskId}
+- **Project:** ${projectName}
+
+## Question for Executives
+Should we approve assigning task ${taskId} to project ${projectName}?
+
+## Voting
+- **Oversight:** [ ] Approve [ ] Reject [ ] Abstain
+- **Monitor:** [ ] Approve [ ] Reject [ ] Abstain
+- **Optimizer:** [ ] Approve [ ] Reject [ ] Abstain
+
+---
+
+**System Note:** This proposal was auto-generated from an escalation. Executives should review and vote.`;
+
+              const proposalPath = `proposals/${escalationId}.md`;
+              // @ts-expect-error Writing markdown proposal
+              await vault.write(proposalPath, proposalMd as unknown);
+
               // Immediately wake the executive agents so the escalation is not silently pending
               try {
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
@@ -1275,14 +1423,14 @@ The Interceptor will catch your trigger line and handle everything automatically
                 success: false,
                 error:
                   "Action requires executive approval. An escalation has been automatically filed.",
-                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Hibernate and await response.`,
+                directive: `[NERVOUS_SYSTEM] Action blocked by Governance. Escalation ${escalationId} filed to Executives. Proposal: proposals/${escalationId}.md. Hibernate and await response.`,
               });
             }
             await patternLearner.recordApproval(
               approvalCheck.computedHash,
               projectName,
               "assign-task",
-              { taskId },
+              {}, // stable params — matches checkAutoApprove hash
               true,
             );
 
@@ -2847,6 +2995,159 @@ The Interceptor will catch your trigger line and handle everything automatically
               message: hasPermission
                 ? `Action "${requestedAction}" is permitted for ${agentType}`
                 : `Action "${requestedAction}" requires governance approval for ${agentType}. Use governance(ask-executive) to request.`,
+            });
+          }
+
+          case "submit-plan": {
+            const projectName = params.projectName as string | undefined;
+            const planContent = params.plan as string | undefined;
+            const description = params.description as string | undefined;
+
+            if (!projectName || !planContent) {
+              return jsonResult({
+                success: false,
+                error: "projectName and plan content required",
+              });
+            }
+
+            const planId = `plan-${projectName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const timestamp = Date.now();
+
+            // Create plan metadata file
+            const planMeta: ManagerPlan = {
+              id: planId,
+              path: `plans/${projectName}/${planId}.json`,
+              projectName,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              submittedAt: timestamp,
+              submittedBy: senderId,
+              version: 1,
+              status: "pending-review",
+              description: description || "Manager plan",
+              votes: {},
+              type: "manager-plan",
+            };
+
+            const planJsonPath = `plans/${projectName}/${planId}.json`;
+
+            // Store plan content within metadata instead of separate file
+            const metaWithContent = {
+              ...planMeta,
+              content: planContent,
+            };
+
+            // Write the metadata (which includes the plan content)
+            // @ts-expect-error ManagerPlan satisfies VaultEntry but TypeScript doesn't infer it
+            await vault.write(planJsonPath, metaWithContent);
+
+            // Wake executives to evaluate the plan
+            try {
+              requestHeartbeatNow({ reason: "plan-submission", agentId: "oversight" });
+              requestHeartbeatNow({ reason: "plan-submission", agentId: "monitor" });
+              requestHeartbeatNow({ reason: "plan-submission", agentId: "optimizer" });
+            } catch {
+              // best effort
+            }
+
+            return jsonResult({
+              success: true,
+              type: "plan-submitted",
+              planId,
+              projectName,
+              status: "pending-review",
+              message: `Plan submitted for ${projectName}. Executives have been notified.`,
+              planPath: planJsonPath,
+            });
+          }
+
+          case "evaluate-plan": {
+            const planId = params.planId as string | undefined;
+            const projectName = params.projectName as string | undefined;
+            const vote = params.vote as string | undefined; // "approve", "reject", "feedback"
+            const feedback = params.feedback as string | undefined;
+            const executive = params.executive as string | undefined;
+
+            if (!planId || !projectName || !vote) {
+              return jsonResult({
+                success: false,
+                error:
+                  "planId, projectName, vote (approve/reject/feedback), and executive required",
+              });
+            }
+
+            const planJsonPath = `plans/${projectName}/${planId}.json`;
+            const planMeta = (await vault.read(planJsonPath)) as unknown as ManagerPlan | null;
+
+            if (!planMeta) {
+              return jsonResult({ success: false, error: `Plan ${planId} not found` });
+            }
+
+            // Record the vote
+            const executiveVoter = executive || senderId; // If no executive specified, use sender
+            const voteType =
+              vote === "approve" || vote === "reject" || vote === "feedback" ? vote : "feedback";
+            planMeta.votes[executiveVoter] = {
+              vote: voteType,
+              feedback: feedback || "",
+              votedAt: Date.now(),
+            };
+            planMeta.updatedAt = Date.now();
+
+            // Check consensus: if all 3 executives have voted
+            const votes = Object.values(planMeta.votes);
+            if (votes.length === 3) {
+              const approvalCount = votes.filter((v) => v.vote === "approve").length;
+              const rejectCount = votes.filter((v) => v.vote === "reject").length;
+
+              if (approvalCount >= 2) {
+                planMeta.status = "approved";
+                planMeta.approvedAt = Date.now();
+              } else if (rejectCount >= 2) {
+                planMeta.status = "rejected";
+                planMeta.rejectedAt = Date.now();
+              } else {
+                // Mixed feedback, needs manager revision
+                planMeta.status = "needs-revision";
+              }
+
+              // Wake the manager to notify them of the decision
+              const manager = (await vault.read(
+                `projects/${projectName}/manager.json`,
+              )) as unknown as Record<string, unknown> | null;
+              if (manager && typeof manager === "object" && "agentSessionId" in manager) {
+                try {
+                  requestHeartbeatNow({
+                    reason: "plan-decision",
+                    agentId: projectName, // Route to the manager's project
+                  });
+                } catch {
+                  // best effort
+                }
+              }
+            }
+
+            // Save updated plan
+            // @ts-expect-error ManagerPlan satisfies VaultEntry but TypeScript doesn't infer it
+            await vault.write(planJsonPath, planMeta);
+
+            return jsonResult({
+              success: true,
+              type: "plan-evaluated",
+              planId,
+              projectName,
+              executiveVoter,
+              vote,
+              planStatus: planMeta.status,
+              totalVotes: votes.length,
+              message:
+                planMeta.status === "approved"
+                  ? "Plan APPROVED. Manager can proceed with execution."
+                  : planMeta.status === "rejected"
+                    ? "Plan REJECTED. Escalate to Main."
+                    : planMeta.status === "needs-revision"
+                      ? "Mixed feedback received. Plan needs revision."
+                      : "Vote recorded. Awaiting other executives.",
             });
           }
 
