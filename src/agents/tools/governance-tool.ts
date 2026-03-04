@@ -626,7 +626,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const approvalCheck = await patternLearner.checkAutoApprove(
               projectName,
               "hire-manager",
-              { description },
+              {}, // exclude description from hash — descriptions vary but project identity is stable
             );
 
             if (approvalCheck.confidence < 80) {
@@ -670,7 +670,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               approvalCheck.computedHash,
               projectName,
               "hire-manager",
-              { description },
+              {}, // stable hash — no description
               true,
             );
 
