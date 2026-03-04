@@ -32,7 +32,10 @@ export class TaskExecutor {
   private sessionCache = new Map<string, string>();
 
   constructor(config: TaskExecutorConfig = {}) {
-    this.workspaceDir = config.workspaceDir || path.join(resolveStateDir(), "workspace");
+    // workspaceDir MUST be provided by caller (who knows the agent context)
+    // Do NOT default to global workspace - each agent has its own workspace
+    this.workspaceDir =
+      config.workspaceDir || path.join(resolveStateDir(), ".skynet", "agents", "system");
     this.config = config.config;
     this.defaultTimeoutMs = config.defaultTimeoutMs || 120000;
     this.systemPrompt = config.systemPrompt || this.buildDefaultSystemPrompt();

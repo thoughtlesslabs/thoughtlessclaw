@@ -3041,13 +3041,71 @@ Should we approve assigning task ${taskId} to project ${projectName}?
             // @ts-expect-error ManagerPlan satisfies VaultEntry but TypeScript doesn't infer it
             await vault.write(planJsonPath, metaWithContent);
 
-            // Wake executives to evaluate the plan
+            // Wake executives with explicit instruction to evaluate the plan
+            const planEvalMessage = `[SYSTEM] New plan submitted for review.
+
+**Plan ID:** ${planId}
+**Project:** ${projectName}
+**Status:** Awaiting evaluation
+
+Please:
+1. Read the plan from: plans/${projectName}/${planId}.json
+2. Review the plan content and description
+3. Vote using: governance(evaluate-plan, planId="${planId}", projectName="${projectName}", vote="approve|reject|feedback", feedback="your thoughts")
+4. System will tally votes: 2/3 approve = APPROVED, 2/3 reject = REJECTED, mixed = NEEDS-REVISION
+
+This is YOUR responsibility as part of the Triad. Proceed with evaluation.`;
+
             try {
-              requestHeartbeatNow({ reason: "plan-submission", agentId: "oversight" });
-              requestHeartbeatNow({ reason: "plan-submission", agentId: "monitor" });
-              requestHeartbeatNow({ reason: "plan-submission", agentId: "optimizer" });
+              // Send direct message to each executive with the plan
+              await callGateway({
+                method: "agent",
+                params: {
+                  sessionKey: "agent:executive:oversight:main",
+                  message: planEvalMessage,
+                  messageChannel: "governance",
+                  label: `Plan Review: ${projectName}`,
+                },
+                timeoutMs: 5000,
+              }).catch(() => {
+                // Fallback: just wake them
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "oversight" });
+              });
+
+              await callGateway({
+                method: "agent",
+                params: {
+                  sessionKey: "agent:executive:monitor:main",
+                  message: planEvalMessage,
+                  messageChannel: "governance",
+                  label: `Plan Review: ${projectName}`,
+                },
+                timeoutMs: 5000,
+              }).catch(() => {
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "monitor" });
+              });
+
+              await callGateway({
+                method: "agent",
+                params: {
+                  sessionKey: "agent:executive:optimizer:main",
+                  message: planEvalMessage,
+                  messageChannel: "governance",
+                  label: `Plan Review: ${projectName}`,
+                },
+                timeoutMs: 5000,
+              }).catch(() => {
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "optimizer" });
+              });
             } catch {
-              // best effort
+              // best effort - fall back to heartbeat
+              try {
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "oversight" });
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "monitor" });
+                requestHeartbeatNow({ reason: "plan-submission", agentId: "optimizer" });
+              } catch {
+                // silent fail
+              }
             }
 
             return jsonResult({
