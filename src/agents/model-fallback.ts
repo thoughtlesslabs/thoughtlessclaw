@@ -531,8 +531,8 @@ export async function runWithModelFallback<T>(params: {
       await incrementActiveModelCalls(candidate.provider, candidate.model);
       const result = await params.run(candidate.provider, candidate.model);
       const primaryKey = `${params.provider}::${params.model}`;
-      if (i > 0) {
-        // Record successful fallback to accelerate future failovers
+      if (i > 0 && candidate.provider === params.provider) {
+        // Record successful fallback within the SAME provider to accelerate future failovers
         _learnedFallbackPrefs[primaryKey] = {
           provider: candidate.provider,
           model: candidate.model,
