@@ -249,6 +249,7 @@ export function resolveAgentDir(cfg: SkynetConfig, agentId: string) {
   if (configured) {
     return resolveUserPath(configured);
   }
-  const root = resolveStateDir(process.env);
-  return path.join(root, "agents", id, "agent");
+  // In the Vault architecture, the agent directory and workspace directory are unified.
+  // We fall back to the workspace dir to ensure old sessions resolving \`agentDir\` point to the Vault.
+  return resolveAgentWorkspaceDir(cfg, id);
 }
