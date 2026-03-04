@@ -108,6 +108,9 @@ export class TickHandlerRegistry {
 
     const { createSurvivalMonitorHandler } = await import("./survival-monitor.js");
     this.handlers.set("survival-monitor", createSurvivalMonitorHandler());
+
+    const { createManagerTickHandler } = await import("./manager-tick.js");
+    this.handlers.set("manager-loop", createManagerTickHandler(vault));
   }
 
   private async runTaskHealer(): Promise<void> {
