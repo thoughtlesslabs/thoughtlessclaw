@@ -39,7 +39,11 @@ export interface PatternVoteEntry {
   timestamp: number;
 }
 
-function hashPattern(taskType: string, context: string, params: Record<string, unknown>): string {
+export function hashPattern(
+  taskType: string,
+  context: string,
+  params: Record<string, unknown>,
+): string {
   const keys = Object.keys(params);
   keys.sort();
   const str = `${taskType}:${context}:${JSON.stringify(params, keys)}`;
@@ -74,23 +78,28 @@ export class PatternLearner {
     taskType: string,
     context: string,
     params: Record<string, unknown>,
-  ): Promise<{ shouldAutoApprove: boolean; confidence: number; pattern?: PatternEntry }> {
+  ): Promise<{
+    shouldAutoApprove: boolean;
+    confidence: number;
+    pattern?: PatternEntry;
+    computedHash: string;
+  }> {
     const patternHash = hashPattern(taskType, context, params);
     const patternPath = `patterns/approved/${patternHash}.json`;
 
     const existing = await this.vault.read<PatternEntry>(patternPath);
 
     if (!existing) {
-      return { shouldAutoApprove: false, confidence: 0 };
+      return { shouldAutoApprove: false, confidence: 0, computedHash: patternHash };
     }
 
     const confidence = this.calculateConfidence(existing);
 
     if (confidence >= AUTO_APPROVE_THRESHOLD) {
-      return { shouldAutoApprove: true, confidence, pattern: existing };
+      return { shouldAutoApprove: true, confidence, pattern: existing, computedHash: patternHash };
     }
 
-    return { shouldAutoApprove: false, confidence, pattern: existing };
+    return { shouldAutoApprove: false, confidence, pattern: existing, computedHash: patternHash };
   }
 
   private calculateConfidence(pattern: PatternEntry): number {

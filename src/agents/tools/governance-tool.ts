@@ -15,7 +15,7 @@ import {
 import { createProjectManager } from "../../skynet/agents/managers/project-manager.js";
 import { WORKER_CONFIGS, createWorkerAgent } from "../../skynet/agents/workers/worker.js";
 import { getPriorityBoard } from "../../skynet/governance/priority-board.js";
-import { getPatternLearner } from "../../skynet/learning/pattern-learner.js";
+import { getPatternLearner, hashPattern } from "../../skynet/learning/pattern-learner.js";
 import { createVaultManager } from "../../skynet/vault/manager.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult } from "./common.js";
@@ -430,7 +430,7 @@ ${
               });
             }
             await patternLearner.recordApproval(
-              approvalCheck.pattern?.patternHash || "unknown",
+              approvalCheck.computedHash,
               projectName,
               "spawn-worker",
               { workerType, taskDescription },
@@ -667,7 +667,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             }
             // Record successful execution of approved pattern
             await patternLearner.recordApproval(
-              approvalCheck.pattern?.patternHash || "unknown",
+              approvalCheck.computedHash,
               projectName,
               "hire-manager",
               { description },
@@ -1160,7 +1160,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               });
             }
             await patternLearner.recordApproval(
-              approvalCheck.pattern?.patternHash || "unknown",
+              approvalCheck.computedHash,
               rLProjectName,
               "create-task",
               { title, description, assignee, priority },
@@ -1275,7 +1275,7 @@ The Interceptor will catch your trigger line and handle everything automatically
               });
             }
             await patternLearner.recordApproval(
-              approvalCheck.pattern?.patternHash || "unknown",
+              approvalCheck.computedHash,
               projectName,
               "assign-task",
               { taskId },
@@ -2416,7 +2416,7 @@ The Interceptor will catch your trigger line and handle everything automatically
 
             if (result.approved) {
               await patternLearner.recordApproval(
-                `${taskType}:${context}`,
+                check.computedHash,
                 taskType,
                 context,
                 { plan },
@@ -2605,7 +2605,7 @@ The Interceptor will catch your trigger line and handle everything automatically
             const context = (params.context as string) || "";
             const success = (params.success as boolean) ?? true;
             const patternLearner = getPatternLearner(vault);
-            const patternHash = `${taskType}:${context}`;
+            const patternHash = hashPattern(taskType, context, {});
 
             if (success) {
               await patternLearner.recordApproval(patternHash, taskType, context, {}, true);
