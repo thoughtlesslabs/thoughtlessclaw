@@ -221,9 +221,11 @@ export class ExecutiveCollaboration {
 
     const { runEmbeddedPiAgent } = await import("../../../agents/pi-embedded-runner/run.js");
     const { createExecutiveAgent } = await import("./executive.js");
-    const { resolveStateDir } = await import("../../../config/paths.js");
+    const { resolveAgentWorkspaceDir } = await import("../../../agents/agent-scope.js");
+    const { loadConfig } = await import("../../../config/config.js");
     const path = await import("node:path");
-    const workspaceDir = path.join(resolveStateDir(), "workspace");
+
+    const cfg = loadConfig();
 
     const tasks = executives.map(async (exec) => {
       try {
@@ -244,12 +246,13 @@ VOTE: <APPROVE|REJECT|ABSTAIN|ESCALATE>
 REASON: <Provide brief, actionable feedback or improvements based on your role>`;
 
         const sessionId = `eval-${exec}-${Date.now()}`;
-        const sessionFile = path.join(workspaceDir, "sessions", `${sessionId}.jsonl`);
+        const agentWorkspaceDir = resolveAgentWorkspaceDir(cfg, exec);
+        const sessionFile = path.join(agentWorkspaceDir, "sessions", `${sessionId}.jsonl`);
 
         const result = await runEmbeddedPiAgent({
           sessionId,
           sessionFile,
-          workspaceDir,
+          workspaceDir: agentWorkspaceDir,
           messageChannel: "governance",
           prompt,
           extraSystemPrompt: agent.getSystemPrompt(),

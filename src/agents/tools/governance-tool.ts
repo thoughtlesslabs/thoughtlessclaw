@@ -414,8 +414,9 @@ ${
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
-              // Immediately wake the executive agent so the escalation is not silently pending
+              // Immediately wake the executive agents so the escalation is not silently pending
               try {
+                requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "oversight" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "monitor" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "optimizer" });
@@ -650,8 +651,9 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
-              // Immediately wake the executive agent so the escalation is not silently pending
+              // Immediately wake the executive agents so the escalation is not silently pending
               try {
+                requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "oversight" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "monitor" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "optimizer" });
@@ -1144,8 +1146,9 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
-              // Immediately wake the executive agent so the escalation is not silently pending
+              // Immediately wake the executive agents so the escalation is not silently pending
               try {
+                requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "oversight" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "monitor" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "optimizer" });
@@ -1259,8 +1262,9 @@ The Interceptor will catch your trigger line and handle everything automatically
                 sender: senderId,
               };
               await vault.write(`events/${escalationId}.json`, escalation);
-              // Immediately wake the executive agent so the escalation is not silently pending
+              // Immediately wake the executive agents so the escalation is not silently pending
               try {
+                requestHeartbeatNow({ reason: "action:escalation", agentId: "main" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "oversight" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "monitor" });
                 requestHeartbeatNow({ reason: "action:escalation", agentId: "optimizer" });

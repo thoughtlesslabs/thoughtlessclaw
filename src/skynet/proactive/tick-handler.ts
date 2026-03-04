@@ -186,7 +186,7 @@ export class TickHandlerRegistry {
       const { resolveAuthStorePath } = await import("../../agents/auth-profiles/paths.js");
       const { loadAuthProfileStore } = await import("../../agents/auth-profiles/store.js");
       const { resolveUserPath } = await import("../../utils.js");
-      const { enqueueSystemEvent } = await import("../../infra/system-events.js");
+      const { tryEnqueueSystemEvent } = await import("../../infra/system-events.js");
       const fs = await import("node:fs/promises");
       const path = await import("node:path");
 
@@ -219,10 +219,10 @@ export class TickHandlerRegistry {
           } else if (credential.expires - now < 3 * 24 * 60 * 60 * 1000) {
             if (!alertedExpiries.has(profileId)) {
               alertedExpiries.add(profileId);
-              enqueueSystemEvent(
+              tryEnqueueSystemEvent(
                 `[System Warning] OAuth Token for ${profileId} (${credential.provider}) is expiring soon (in less than 3 days). Please re-authenticate to prevent disruption.`,
                 { contextKey: "OAuth Expiry" },
-              ).catch(() => {});
+              );
             }
           }
         }

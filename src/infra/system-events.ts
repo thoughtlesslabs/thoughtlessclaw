@@ -27,6 +27,11 @@ function requireSessionKey(key?: string | null): string {
   return trimmed;
 }
 
+function trySessionKey(key?: string | null): string | null {
+  const trimmed = typeof key === "string" ? key.trim() : "";
+  return trimmed || null;
+}
+
 function normalizeContextKey(key?: string | null): string | null {
   if (!key) {
     return null;
@@ -70,6 +75,46 @@ export function enqueueSystemEvent(text: string, options: SystemEventOptions) {
   if (entry.lastText === cleaned) {
     return;
   } // skip consecutive duplicates
+  entry.lastText = cleaned;
+  entry.queue.push({
+    text: cleaned,
+    ts: Date.now(),
+    contextKey: normalizedContextKey,
+  });
+  if (entry.queue.length > MAX_EVENTS) {
+    entry.queue.shift();
+  }
+}
+
+// Optional version for background processes (tick handlers, etc) that may not have a sessionKey
+export function tryEnqueueSystemEvent(
+  text: string,
+  options?: { sessionKey?: string | null; contextKey?: string | null },
+) {
+  const key = trySessionKey(options?.sessionKey);
+  if (!key) {
+    return; // silently skip if no sessionKey available
+  }
+  const entry =
+    queues.get(key) ??
+    (() => {
+      const created: SessionQueue = {
+        queue: [],
+        lastText: null,
+        lastContextKey: null,
+      };
+      queues.set(key, created);
+      return created;
+    })();
+  const cleaned = text.trim();
+  if (!cleaned) {
+    return;
+  }
+  const normalizedContextKey = normalizeContextKey(options?.contextKey);
+  entry.lastContextKey = normalizedContextKey;
+  if (entry.lastText === cleaned) {
+    return;
+  }
   entry.lastText = cleaned;
   entry.queue.push({
     text: cleaned,
